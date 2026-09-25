@@ -1,0 +1,16 @@
+{
+  "name": "marsh-evidence-first-advisory",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Marsh internship case study: evidence-first insurance advisory monorepo (Next.js frontend + FastAPI/LangGraph backend)",
+  "scripts": {
+    "setup:backend": "cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt",
+    "setup:frontend": "cd frontend && npm install",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "dev:backend": "cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000",
+    "ingest": "cd backend && .venv/bin/python scripts/ingest_policies.py --extract",
+    "test:backend": "cd backend && .venv/bin/python -m pytest -q ../tests -p no:warnings",
+    "lint:frontend": "cd frontend && npx eslint src && npx tsc --noEmit -p ."
+  }
+}

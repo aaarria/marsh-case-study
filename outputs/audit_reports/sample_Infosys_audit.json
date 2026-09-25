@@ -1,0 +1,1427 @@
+{
+  "audit_id": "audit_574fa46933a6",
+  "pitch_id": "pitch_b43b08cec064",
+  "pitch_version": 1,
+  "summary": {
+    "total_claims": 21,
+    "material_claims": 5,
+    "supported": 5,
+    "partially_supported": 0,
+    "contradicted": 0,
+    "not_found": 0,
+    "uncertain": 0,
+    "not_applicable": 16,
+    "gate": "PASS",
+    "confidence_score": 1.0
+  },
+  "claims": [
+    {
+      "claim": {
+        "claim_id": "86685d782703",
+        "claim_text": "Industry (advisor input): IT services",
+        "claim_type": "COMPANY",
+        "slide": 1,
+        "bullet_index": 0,
+        "policy_id": null,
+        "feature_key": null,
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "86685d782703",
+        "claim_text": "Industry (advisor input): IT services",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "cb2a06c975b1",
+        "claim_text": "Geography (advisor input): India",
+        "claim_type": "COMPANY",
+        "slide": 1,
+        "bullet_index": 1,
+        "policy_id": null,
+        "feature_key": "network_hospitals",
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "cb2a06c975b1",
+        "claim_text": "Geography (advisor input): India",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "bfb325949543",
+        "claim_text": "Employee count (advisor input): 320,000",
+        "claim_type": "COMPANY",
+        "slide": 1,
+        "bullet_index": 2,
+        "policy_id": null,
+        "feature_key": null,
+        "numbers": [
+          "320,000"
+        ],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "bfb325949543",
+        "claim_text": "Employee count (advisor input): 320,000",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "3247372c6702",
+        "claim_text": "Advisor priority: wellness and OPD: The advisor flagged 'wellness and OPD' as a client priority. (fact)",
+        "claim_type": "COMPANY",
+        "slide": 1,
+        "bullet_index": 3,
+        "policy_id": null,
+        "feature_key": "health_checkup",
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "3247372c6702",
+        "claim_text": "Advisor priority: wellness and OPD: The advisor flagged 'wellness and OPD' as a client priority. (fact)",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "aff98ce65c30",
+        "claim_text": "Employee hospitalisation: Employees and dependents need in-patient cover with restore of the sum insured after a large claim. (fact)",
+        "claim_type": "COMPANY",
+        "slide": 1,
+        "bullet_index": 4,
+        "policy_id": null,
+        "feature_key": "restore_recharge",
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "aff98ce65c30",
+        "claim_text": "Employee hospitalisation: Employees and dependents need in-patient cover with restore of the sum insured after a large claim. (fact)",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "a437bd7ca19a",
+        "claim_text": "Waiting periods for new joiners: New employees with pre-existing conditions face waiting periods before cover applies. (inference)",
+        "claim_type": "ASSUMPTION",
+        "slide": 1,
+        "bullet_index": 5,
+        "policy_id": null,
+        "feature_key": "waiting_period_ped",
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "a437bd7ca19a",
+        "claim_text": "Waiting periods for new joiners: New employees with pre-existing conditions face waiting periods before cover applies. (inference)",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "0caf128cdd02",
+        "claim_text": "Preventive health check-up: You will be provided preventive health check-up benefits post completion of every policy year, irrespective of claim status.",
+        "claim_type": "POLICY",
+        "slide": 2,
+        "bullet_index": 0,
+        "policy_id": "hdfc_optima_secure_plus",
+        "feature_key": "health_checkup",
+        "numbers": [],
+        "material": true
+      },
+      "status": "SUPPORTED",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Citation resolves to HDFC ERGO Optima Secure+ p.5, Preventive Health Check-up (term overlap 100%)."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "No numbers in claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Claim does not assert positive coverage."
+        },
+        {
+          "check": "contradiction",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "No internal contradiction detected."
+        },
+        {
+          "check": "coverage",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Heuristic (no LLM): strong term overlap with evidence (100%)."
+        }
+      ],
+      "evidence": [
+        {
+          "policy_id": "hdfc_optima_secure_plus",
+          "policy_name": "HDFC ERGO Optima Secure+",
+          "chunk_id": "hdfc_optima_secure_plus:357b5d10b890",
+          "page": 5,
+          "section": "Preventive Health Check-up",
+          "clause": "p5.2",
+          "content_type": "clause",
+          "source_text": "You will be provided preventive health check-up benefits post completion of every policy year, irrespective of claim status.",
+          "retrieval_relevance": null,
+          "linked_conditions": []
+        }
+      ],
+      "passport": {
+        "claim_id": "0caf128cdd02",
+        "claim_text": "Preventive health check-up: You will be provided preventive health check-up benefits post completion of every policy year, irrespective of claim status.",
+        "policy_id": "hdfc_optima_secure_plus",
+        "policy_name": "HDFC ERGO Optima Secure+",
+        "page": 5,
+        "section": "Preventive Health Check-up",
+        "clause": "p5.2",
+        "source_text": "You will be provided preventive health check-up benefits post completion of every policy year, irrespective of claim status.",
+        "retrieval_relevance": null,
+        "verification": "SUPPORTED",
+        "audit": "PASS",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "5534284100b1",
+        "claim_text": "Teleconsultation / OPD: Optima Wellbeing (Add-on) Covers various outpatient benefits.",
+        "claim_type": "POLICY",
+        "slide": 2,
+        "bullet_index": 1,
+        "policy_id": "hdfc_optima_secure_plus",
+        "feature_key": "teleconsultation_opd",
+        "numbers": [],
+        "material": true
+      },
+      "status": "SUPPORTED",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Citation resolves to HDFC ERGO Optima Secure+ p.8, ABCD Chronic Care (term overlap 75%)."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "No numbers in claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "No conflicting exclusion found."
+        },
+        {
+          "check": "contradiction",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "No internal contradiction detected."
+        },
+        {
+          "check": "coverage",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Heuristic (no LLM): strong term overlap with evidence (75%)."
+        }
+      ],
+      "evidence": [
+        {
+          "policy_id": "hdfc_optima_secure_plus",
+          "policy_name": "HDFC ERGO Optima Secure+",
+          "chunk_id": "hdfc_optima_secure_plus:f528df528308",
+          "page": 8,
+          "section": "ABCD Chronic Care",
+          "clause": "p8.4",
+          "content_type": "add_on",
+          "source_text": "Optima Wellbeing (Add-on) Covers various outpatient benefits",
+          "retrieval_relevance": null,
+          "linked_conditions": []
+        }
+      ],
+      "passport": {
+        "claim_id": "5534284100b1",
+        "claim_text": "Teleconsultation / OPD: Optima Wellbeing (Add-on) Covers various outpatient benefits.",
+        "policy_id": "hdfc_optima_secure_plus",
+        "policy_name": "HDFC ERGO Optima Secure+",
+        "page": 8,
+        "section": "ABCD Chronic Care",
+        "clause": "p8.4",
+        "source_text": "Optima Wellbeing (Add-on) Covers various outpatient benefits",
+        "retrieval_relevance": null,
+        "verification": "SUPPORTED",
+        "audit": "PASS",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "9dab01de1e0e",
+        "claim_text": "In-patient hospitalisation: Hospitalisation Expenses: Up to sum insured.",
+        "claim_type": "POLICY",
+        "slide": 2,
+        "bullet_index": 2,
+        "policy_id": "hdfc_optima_secure_plus",
+        "feature_key": "in_patient_hospitalisation",
+        "numbers": [],
+        "material": true
+      },
+      "status": "SUPPORTED",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Citation resolves to HDFC ERGO Optima Secure+ p.11, Schedule of Key Benefits (term overlap 80%)."
+        },
+        {
+          "check": "numerical",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "All figures in the claim appear in the cited evidence."
+        },
+        {
+          "check": "exclusion",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "No conflicting exclusion found."
+        },
+        {
+          "check": "contradiction",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "No internal contradiction detected."
+        },
+        {
+          "check": "coverage",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Heuristic (no LLM): strong term overlap with evidence (80%)."
+        }
+      ],
+      "evidence": [
+        {
+          "policy_id": "hdfc_optima_secure_plus",
+          "policy_name": "HDFC ERGO Optima Secure+",
+          "chunk_id": "hdfc_optima_secure_plus:d29a2913f649",
+          "page": 11,
+          "section": "Schedule of Key Benefits",
+          "clause": "p11.5",
+          "content_type": "table_row",
+          "source_text": "Hospitalisation Expenses: Up to sum insured",
+          "retrieval_relevance": null,
+          "linked_conditions": []
+        }
+      ],
+      "passport": {
+        "claim_id": "9dab01de1e0e",
+        "claim_text": "In-patient hospitalisation: Hospitalisation Expenses: Up to sum insured.",
+        "policy_id": "hdfc_optima_secure_plus",
+        "policy_name": "HDFC ERGO Optima Secure+",
+        "page": 11,
+        "section": "Schedule of Key Benefits",
+        "clause": "p11.5",
+        "source_text": "Hospitalisation Expenses: Up to sum insured",
+        "retrieval_relevance": null,
+        "verification": "SUPPORTED",
+        "audit": "PASS",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "17ffb5d8ea7f",
+        "claim_text": "Room rent limit: Room Rent: At actuals.",
+        "claim_type": "POLICY",
+        "slide": 2,
+        "bullet_index": 3,
+        "policy_id": "hdfc_optima_secure_plus",
+        "feature_key": "room_rent",
+        "numbers": [],
+        "material": true
+      },
+      "status": "SUPPORTED",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Citation resolves to HDFC ERGO Optima Secure+ p.11, Schedule of Key Benefits (term overlap 75%)."
+        },
+        {
+          "check": "numerical",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "All figures in the claim appear in the cited evidence."
+        },
+        {
+          "check": "exclusion",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "No conflicting exclusion found."
+        },
+        {
+          "check": "contradiction",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "No internal contradiction detected."
+        },
+        {
+          "check": "coverage",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Heuristic (no LLM): strong term overlap with evidence (75%)."
+        }
+      ],
+      "evidence": [
+        {
+          "policy_id": "hdfc_optima_secure_plus",
+          "policy_name": "HDFC ERGO Optima Secure+",
+          "chunk_id": "hdfc_optima_secure_plus:1d11c25a9c01",
+          "page": 11,
+          "section": "Schedule of Key Benefits",
+          "clause": "p11.4",
+          "content_type": "table_row",
+          "source_text": "Room Rent: At actuals",
+          "retrieval_relevance": null,
+          "linked_conditions": []
+        }
+      ],
+      "passport": {
+        "claim_id": "17ffb5d8ea7f",
+        "claim_text": "Room rent limit: Room Rent: At actuals.",
+        "policy_id": "hdfc_optima_secure_plus",
+        "policy_name": "HDFC ERGO Optima Secure+",
+        "page": 11,
+        "section": "Schedule of Key Benefits",
+        "clause": "p11.4",
+        "source_text": "Room Rent: At actuals",
+        "retrieval_relevance": null,
+        "verification": "SUPPORTED",
+        "audit": "PASS",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "40e479d0e7e8",
+        "claim_text": "Restore / recharge of sum insured: Automatic Restore Benefit (Unlimited times): Up to 100% of base sum insured, for any illness, for any insured person, unlimited times in a policy year.",
+        "claim_type": "POLICY",
+        "slide": 2,
+        "bullet_index": 4,
+        "policy_id": "hdfc_optima_secure_plus",
+        "feature_key": "restore_recharge",
+        "numbers": [
+          "100%"
+        ],
+        "material": true
+      },
+      "status": "SUPPORTED",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Citation resolves to HDFC ERGO Optima Secure+ p.11, Schedule of Key Benefits (term overlap 92%)."
+        },
+        {
+          "check": "numerical",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "All figures in the claim appear in the cited evidence."
+        },
+        {
+          "check": "exclusion",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "No conflicting exclusion found."
+        },
+        {
+          "check": "contradiction",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "No internal contradiction detected."
+        },
+        {
+          "check": "coverage",
+          "passed": true,
+          "status": "SUPPORTED",
+          "detail": "Heuristic (no LLM): strong term overlap with evidence (92%)."
+        }
+      ],
+      "evidence": [
+        {
+          "policy_id": "hdfc_optima_secure_plus",
+          "policy_name": "HDFC ERGO Optima Secure+",
+          "chunk_id": "hdfc_optima_secure_plus:fb258c9c9e2b",
+          "page": 11,
+          "section": "Schedule of Key Benefits",
+          "clause": "p11.14",
+          "content_type": "table_row",
+          "source_text": "Automatic Restore Benefit (Unlimited times): Up to 100% of base sum insured, for any illness, for any insured person, unlimited times in a policy year",
+          "retrieval_relevance": null,
+          "linked_conditions": []
+        }
+      ],
+      "passport": {
+        "claim_id": "40e479d0e7e8",
+        "claim_text": "Restore / recharge of sum insured: Automatic Restore Benefit (Unlimited times): Up to 100% of base sum insured, for any illness, for any insured person, unlimited times in a policy year.",
+        "policy_id": "hdfc_optima_secure_plus",
+        "policy_name": "HDFC ERGO Optima Secure+",
+        "page": 11,
+        "section": "Schedule of Key Benefits",
+        "clause": "p11.14",
+        "source_text": "Automatic Restore Benefit (Unlimited times): Up to 100% of base sum insured, for any illness, for any insured person, unlimited times in a policy year",
+        "retrieval_relevance": null,
+        "verification": "SUPPORTED",
+        "audit": "PASS",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "9cf73f3bc5e6",
+        "claim_text": "Preventive health check-up: stated as covered in HDFC ERGO Optima Secure+; not found, excluded or add-on in Care Health Care Supreme, Aditya Birla Activ One, Niva Bupa ReAssure 2.0 (per brochures).",
+        "claim_type": "RECOMMENDATION",
+        "slide": 3,
+        "bullet_index": 0,
+        "policy_id": null,
+        "feature_key": "health_checkup",
+        "numbers": [
+          "2.0"
+        ],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "9cf73f3bc5e6",
+        "claim_text": "Preventive health check-up: stated as covered in HDFC ERGO Optima Secure+; not found, excluded or add-on in Care Health Care Supreme, Aditya Birla Activ One, Niva Bupa ReAssure 2.0 (per brochures).",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "2664304d020b",
+        "claim_text": "In-patient hospitalisation: stated as covered in HDFC ERGO Optima Secure+; not found, excluded or add-on in Care Health Care Supreme, Aditya Birla Activ One (per brochures).",
+        "claim_type": "RECOMMENDATION",
+        "slide": 3,
+        "bullet_index": 1,
+        "policy_id": null,
+        "feature_key": "in_patient_hospitalisation",
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "2664304d020b",
+        "claim_text": "In-patient hospitalisation: stated as covered in HDFC ERGO Optima Secure+; not found, excluded or add-on in Care Health Care Supreme, Aditya Birla Activ One (per brochures).",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "a11983946694",
+        "claim_text": "Room rent limit: stated as covered in HDFC ERGO Optima Secure+; not found, excluded or add-on in Niva Bupa ReAssure 2.0 (per brochures).",
+        "claim_type": "RECOMMENDATION",
+        "slide": 3,
+        "bullet_index": 2,
+        "policy_id": null,
+        "feature_key": "room_rent",
+        "numbers": [
+          "2.0"
+        ],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "a11983946694",
+        "claim_text": "Room rent limit: stated as covered in HDFC ERGO Optima Secure+; not found, excluded or add-on in Niva Bupa ReAssure 2.0 (per brochures).",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "10d7184adc9c",
+        "claim_text": "Watch-out: The brochure does not address Wellness renewal discount; exposure 'Advisor priority: wellness and OPD' cannot be confirmed as covered (unknown, not excluded).",
+        "claim_type": "RECOMMENDATION",
+        "slide": 3,
+        "bullet_index": 3,
+        "policy_id": null,
+        "feature_key": "wellness_renewal_discount",
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "10d7184adc9c",
+        "claim_text": "Watch-out: The brochure does not address Wellness renewal discount; exposure 'Advisor priority: wellness and OPD' cannot be confirmed as covered (unknown, not excluded).",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "961a4191d25e",
+        "claim_text": "Watch-out: Teleconsultation / OPD is only available as an optional add-on at extra premium.",
+        "claim_type": "RECOMMENDATION",
+        "slide": 3,
+        "bullet_index": 4,
+        "policy_id": null,
+        "feature_key": "teleconsultation_opd",
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "961a4191d25e",
+        "claim_text": "Watch-out: Teleconsultation / OPD is only available as an optional add-on at extra premium.",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "840ee30bab25",
+        "claim_text": "Recommended: HDFC ERGO Optima Secure+ (fit score 56.3/100, decision-support only).",
+        "claim_type": "RECOMMENDATION",
+        "slide": 4,
+        "bullet_index": 0,
+        "policy_id": null,
+        "feature_key": null,
+        "numbers": [
+          "56.3",
+          "100,"
+        ],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "840ee30bab25",
+        "claim_text": "Recommended: HDFC ERGO Optima Secure+ (fit score 56.3/100, decision-support only).",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "f3c4144e9b53",
+        "claim_text": "Assumption: All four documents are retail individual/family-floater product brochures; group/corporate terms are not stated. The recommendation assumes a voluntary or employee-choice retail plan facilitated by Marsh.",
+        "claim_type": "ASSUMPTION",
+        "slide": 4,
+        "bullet_index": 1,
+        "policy_id": null,
+        "feature_key": "family_composition",
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "f3c4144e9b53",
+        "claim_text": "Assumption: All four documents are retail individual/family-floater product brochures; group/corporate terms are not stated. The recommendation assumes a voluntary or employee-choice retail plan facilitated by Marsh.",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "dbeec20f341b",
+        "claim_text": "Assumption: Brochure content is summary-level; the policy wording prevails.",
+        "claim_type": "ASSUMPTION",
+        "slide": 4,
+        "bullet_index": 2,
+        "policy_id": null,
+        "feature_key": null,
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "dbeec20f341b",
+        "claim_text": "Assumption: Brochure content is summary-level; the policy wording prevails.",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "78d9b177e787",
+        "claim_text": "Marsh advises on programme design, insurer negotiation and employee communication, and supports claims advocacy through the policy year.",
+        "claim_type": "MARSH_POSITIONING",
+        "slide": 4,
+        "bullet_index": 3,
+        "policy_id": null,
+        "feature_key": null,
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "78d9b177e787",
+        "claim_text": "Marsh advises on programme design, insurer negotiation and employee communication, and supports claims advocacy through the policy year.",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    },
+    {
+      "claim": {
+        "claim_id": "b785855ae63c",
+        "claim_text": "Next step: confirm group terms and policy wording with the insurer before client presentation.",
+        "claim_type": "RECOMMENDATION",
+        "slide": 4,
+        "bullet_index": 4,
+        "policy_id": null,
+        "feature_key": null,
+        "numbers": [],
+        "material": false
+      },
+      "status": "NOT_APPLICABLE",
+      "checks": [
+        {
+          "check": "citation",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim; citation not required."
+        },
+        {
+          "check": "numerical",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "exclusion",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "contradiction",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        },
+        {
+          "check": "coverage",
+          "passed": null,
+          "status": "NOT_APPLICABLE",
+          "detail": "Non-policy claim."
+        }
+      ],
+      "evidence": [],
+      "passport": {
+        "claim_id": "b785855ae63c",
+        "claim_text": "Next step: confirm group terms and policy wording with the insurer before client presentation.",
+        "policy_id": null,
+        "policy_name": null,
+        "page": null,
+        "section": null,
+        "clause": null,
+        "source_text": null,
+        "retrieval_relevance": null,
+        "verification": "NOT_APPLICABLE",
+        "audit": "N/A",
+        "linked_conditions": []
+      },
+      "action": "NONE",
+      "correction_hint": null
+    }
+  ],
+  "major_policy_gaps": [
+    "The brochure does not address Wellness renewal discount; exposure 'Advisor priority: wellness and OPD' cannot be confirmed as covered (unknown, not excluded).",
+    "Teleconsultation / OPD is only available as an optional add-on at extra premium.",
+    "The brochure does not address Wellness renewal discount; exposure 'Young, sedentary knowledge workforce' cannot be confirmed as covered (unknown, not excluded).",
+    "Teleconsultation / OPD is only available as an optional add-on at extra premium.",
+    "Maternity cover is explicitly excluded; exposure 'Young, sedentary knowledge workforce' remains unresolved."
+  ],
+  "generated_at": "2026-09-25T19:27:45.934170+00:00",
+  "note": "Retrieval relevance is a ranking signal, not factual accuracy."
+}

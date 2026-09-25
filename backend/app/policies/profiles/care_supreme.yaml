@@ -1,0 +1,38 @@
+policy_id: care_supreme
+policy_name: Care Health Care Supreme
+short_label: Policy B
+insurer: Care Health Insurance Limited
+product_uin: CHIHLIP27061V032627
+file_patterns:
+  - "Care*.pdf"
+variants: ["Care Supreme", "Care Advanced (add-on)", "Care OPD (add-on)"]
+text_mode_pages: []
+skip_pages: []
+page_default_sections:
+  1: "Care Supreme Highlights"
+  3: "Optional Benefits"
+  4: "Optional Benefits"
+section_hints:
+  "Eligibility Criteria": eligibility
+  "Plan Details": plan_details
+  "Optional Benefits": optional_benefits
+  "Wait Periods": waiting_periods
+  "ABOUT US": marketing_stats
+marketing_stat_patterns:
+  - "Smart Insurer"
+  - "Sales Champion"
+  - "awarded"
+add_on_names:
+  - Care OPD
+  - Care Advanced
+  - Cumulative Bonus Booster
+  - Unlimited Care
+  - Claim Shield
+  - Claim Shield+
+  - Cumulative Bonus Super
+  - Instant Cover
+  - Modification of PED Wait Period
+  - Be-Fit
+  - Wellness Benefit
+  - Air Ambulance
+  - Annual Health Check-up

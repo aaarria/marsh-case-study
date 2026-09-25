@@ -1,0 +1,437 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+/* Hover styles never apply to disabled controls, so disabled buttons keep pointer events
+   (for the cursor and their `title` hint) without lighting up. */
+@custom-variant hover {
+  @media (hover: hover) {
+    &:hover:not(:disabled, [aria-disabled="true"]) {
+      @slot;
+    }
+  }
+}
+
+/* =============================================================================
+   DESIGN TOKENS
+   Three foundation variables (base hue, accent, contrast) derive every surface,
+   text tone and hairline in OKLCH. Chrome is achromatic and layered (Linear);
+   the slide — the product — is the only object allowed brand colour (Chronicle).
+   Never use raw colour values in components: reach for a semantic token below.
+   ============================================================================= */
+
+:root {
+  /* --- foundations ------------------------------------------------------- */
+  --base-hue: 250;           /* cool near-neutral, like #08090A / #F7F8F8 */
+  --base-chroma: 0.004;
+  --accent-hue: 275;         /* rationed indigo: focus, links, active markers */
+  --contrast: 1;             /* 1 = default; >1 = higher-contrast theme */
+
+  /* --- type ---------------------------------------------------------------- */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --tracking-display: -0.028em;
+  --tracking-title: -0.016em;
+  --tracking-body: -0.006em;
+  --tracking-caps: 0.06em;
+
+  /* --- shape --------------------------------------------------------------- */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
+  --radius-4xl: 20px;
+
+  /* --- motion -------------------------------------------------------------- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.3, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 320ms;
+
+  /* --- slide (the product; Marsh's template as measured from the brief; theme-independent) ---- */
+  --slide-bg: #ffffff;
+  --slide-ink: #000f47;                   /* Marsh navy: header band, titles, body text */
+  --slide-body: #000f47;
+  --slide-muted: #64748b;                 /* slate: subtitles, sources, disclaimer */
+  --slide-rule: #cbd5e1;                  /* hairline: card border, column divider */
+  --slide-canvas: #f4f7fb;                /* light canvas behind the single-column card */
+  --slide-sky: #a7e2f0;                   /* cover background */
+  --slide-accent: #00a8c7;                /* teal: citation markers */
+  --slide-accent-tint: #e6f7fa;
+  --slide-hover: #f4f7fb;
+  --font-slide-serif: "Georgia Pro", Georgia, "Times New Roman", serif;
+  --font-slide-sans: Calibri, Carlito, "Segoe UI", var(--font-sans);
+}
+
+/* ---------------------------------------------------------------------------
+   DARK — Linear: #08090A canvas, surface ladder for depth, no drop shadows.
+   --------------------------------------------------------------------------- */
+:root {
+  --canvas:   oklch(0.135 var(--base-chroma) var(--base-hue));
+  --panel:    oklch(0.165 var(--base-chroma) var(--base-hue));
+  --surface:  oklch(0.19 var(--base-chroma) var(--base-hue));
+  --raised:   oklch(0.225 var(--base-chroma) var(--base-hue));
+  --overlay:  oklch(0.245 var(--base-chroma) var(--base-hue));
+  --veil:     oklch(0.135 var(--base-chroma) var(--base-hue) / 0.8);
+
+  --ink:      oklch(0.975 0.002 var(--base-hue));
+  --body:     oklch(0.86 0.006 var(--base-hue));
+  --ink-muted: oklch(0.63 0.008 var(--base-hue));
+  --quiet:    oklch(0.48 0.008 var(--base-hue));
+
+  --hairline:        oklch(1 0 0 / calc(0.08 * var(--contrast)));
+  --hairline-strong: oklch(1 0 0 / calc(0.12 * var(--contrast)));
+  --hairline-bright: oklch(1 0 0 / calc(0.2 * var(--contrast)));
+
+  --accent:      oklch(0.66 0.14 var(--accent-hue));
+
+  --ok:      oklch(0.72 0.16 150);  --ok-fg:      oklch(0.8 0.14 150);
+  --warn:    oklch(0.8 0.15 80);    --warn-fg:    oklch(0.85 0.13 85);
+  --danger:  oklch(0.68 0.19 25);   --danger-fg:  oklch(0.78 0.15 25);
+  --info:    oklch(0.72 0.12 240);  --info-fg:    oklch(0.8 0.1 240);
+  --neutral: oklch(0.6 0.008 var(--base-hue)); --neutral-fg: var(--ink-muted);
+
+  /* depth comes from the ladder; shadows only add a hairline */
+  --shadow-1: 0 0 0 1px var(--hairline);
+  --shadow-2: 0 0 0 1px var(--hairline-strong), 0 8px 24px -8px oklch(0 0 0 / 0.5);
+  --shadow-3: 0 0 0 1px var(--hairline-strong), 0 24px 64px -16px oklch(0 0 0 / 0.7);
+
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------------
+   shadcn/ui contract — every primitive reads these, so it inherits the system.
+   --------------------------------------------------------------------------- */
+:root {
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --popover: var(--overlay);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);                 /* filled buttons invert: the brightest object */
+  --primary-foreground: var(--canvas);
+  --secondary: var(--raised);
+  --secondary-foreground: var(--ink);
+  --muted: var(--raised);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--raised);               /* shadcn "accent" = hover fill, not brand */
+  --destructive: var(--danger);
+  --border: var(--hairline);
+  --input: var(--hairline-strong);
+  --ring: var(--accent);
+}
+
+/* ---------------------------------------------------------------------------
+   Tailwind theme — exposes tokens as utilities (bg-panel, text-quiet, border-hairline …)
+   and tunes the global type scale to Linear density (13px labels, 15px body, 510/590).
+   --------------------------------------------------------------------------- */
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+
+  --font-weight-medium: 510;
+  --font-weight-semibold: 590;
+  --font-weight-bold: 680;
+
+  --text-2xs: 0.6875rem;  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;     --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;   --text-sm--line-height: 1.25rem;
+  --text-base: 0.9375rem; --text-base--line-height: 1.5rem;
+  --text-lg: 1.0625rem;   --text-lg--line-height: 1.5rem;
+  --text-xl: 1.25rem;     --text-xl--line-height: 1.6rem;
+  --text-2xl: 1.5rem;     --text-2xl--line-height: 1.9rem;
+  --text-3xl: 1.875rem;   --text-3xl--line-height: 2.2rem;
+  --text-4xl: 2.375rem;   --text-4xl--line-height: 2.6rem;
+
+  --tracking-display: var(--tracking-display);
+  --tracking-title: var(--tracking-title);
+  --tracking-body: var(--tracking-body);
+  --tracking-caps: var(--tracking-caps);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-3xl: var(--radius-3xl);
+  --radius-4xl: var(--radius-4xl);
+
+  --shadow-1: var(--shadow-1);
+  --shadow-2: var(--shadow-2);
+  --shadow-3: var(--shadow-3);
+
+  --ease-out: var(--ease-out);
+  --ease-spring: var(--ease-spring);
+
+  /* semantic surfaces & text */
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-overlay: var(--overlay);
+  --color-veil: var(--veil);
+  --color-ink: var(--ink);
+  --color-body: var(--body);
+  --color-quiet: var(--quiet);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-hairline-bright: var(--hairline-bright);
+
+  /* status */
+  --color-ok: var(--ok);           --color-ok-fg: var(--ok-fg);
+  --color-warn: var(--warn);       --color-warn-fg: var(--warn-fg);
+  --color-danger: var(--danger);   --color-danger-fg: var(--danger-fg);
+  --color-info: var(--info);       --color-info-fg: var(--info-fg);
+  --color-neutral: var(--neutral); --color-neutral-fg: var(--neutral-fg);
+
+  /* slide */
+  --color-slide-bg: var(--slide-bg);
+  --color-slide-ink: var(--slide-ink);
+  --color-slide-body: var(--slide-body);
+  --color-slide-muted: var(--slide-muted);
+  --color-slide-rule: var(--slide-rule);
+  --color-slide-canvas: var(--slide-canvas);
+  --color-slide-sky: var(--slide-sky);
+  --color-slide-accent: var(--slide-accent);
+  --color-slide-accent-tint: var(--slide-accent-tint);
+  --color-slide-hover: var(--slide-hover);
+  --font-slide-serif: var(--font-slide-serif);
+  --font-slide-sans: var(--font-slide-sans);
+
+  /* shadcn aliases */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    scrollbar-gutter: stable;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-background text-foreground text-sm;
+    letter-spacing: var(--tracking-body);
+    font-feature-settings: "cv11", "ss01", "ss03", "tnum", "calt";
+  }
+  h1, h2, h3, h4 {
+    @apply font-heading text-balance;
+    letter-spacing: var(--tracking-title);
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--accent) 28%, transparent);
+  }
+  button, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Cursor states. Tailwind's preflight gives buttons the arrow cursor; anything clickable
+     shows a hand, anything disabled shows not-allowed, and text inside controls never shows the I-beam. */
+  a[href], label[for], summary,
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]),
+  input:is([type="checkbox"], [type="radio"], [type="submit"], [type="button"]):not(:disabled),
+  select:not(:disabled), label:has(> input:is([type="checkbox"], [type="radio"]):not(:disabled)) {
+    cursor: pointer;
+  }
+  :disabled, [aria-disabled="true"], label:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+  button, [role="button"], a[href], label, summary {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  input, textarea, [contenteditable] {
+    cursor: text;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  /* Tactile press: Linear scales interactive elements slightly on :active. */
+  [data-slot="button"]:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Components (token-driven; the only place semantic status colours are composed)
+   --------------------------------------------------------------------------- */
+@layer components {
+  /* Status tints: alpha over the current surface so they read on any theme. */
+  .tone-ok       { --tone: var(--ok);      --tone-fg: var(--ok-fg); }
+  .tone-warn     { --tone: var(--warn);    --tone-fg: var(--warn-fg); }
+  .tone-danger   { --tone: var(--danger);  --tone-fg: var(--danger-fg); }
+  .tone-info     { --tone: var(--info);    --tone-fg: var(--info-fg); }
+  .tone-neutral  { --tone: var(--neutral); --tone-fg: var(--neutral-fg); }
+
+  .tint {
+    color: var(--tone-fg);
+    background: color-mix(in oklch, var(--tone) 12%, transparent);
+    border-color: color-mix(in oklch, var(--tone) 28%, transparent);
+  }
+  .tint-strong {
+    color: var(--tone-fg);
+    background: color-mix(in oklch, var(--tone) 20%, transparent);
+    border-color: color-mix(in oklch, var(--tone) 40%, transparent);
+  }
+  .tint-text { color: var(--tone-fg); }
+  .tint-dot { background: var(--tone); }
+
+  /* Small caps label above values, sections and metadata. */
+  .kicker {
+    @apply text-2xs font-medium uppercase text-muted-foreground;
+    letter-spacing: var(--tracking-caps);
+  }
+
+  /* Display type: compressed, editorial. */
+  .display {
+    letter-spacing: var(--tracking-display);
+    @apply font-semibold text-ink;
+  }
+
+  /* Hairline-framed surface; the default container. */
+  .panel {
+    @apply rounded-xl border border-hairline bg-surface;
+  }
+
+  /* Numbered citation marker rendered after a claim; opens the source preview. */
+  .cite {
+    @apply inline-flex min-w-[1.1em] items-center justify-center rounded-[0.25em] px-[0.15em] align-super text-[0.62em] font-semibold leading-none text-slide-accent transition-colors;
+  }
+  .cite:hover, .cite[data-active="true"] { @apply bg-slide-accent text-white; }
+
+  /* 16:9 slide frame in Marsh's template. Typography scales with the container so thumbnails and the canvas share one renderer. */
+  .slide-frame {
+    container-type: inline-size;
+    aspect-ratio: 16 / 9;
+    @apply relative w-full overflow-hidden rounded-md bg-slide-bg font-slide-sans text-slide-body;
+    box-shadow: var(--shadow-2);
+  }
+  /* --- Matrix dot loader (Transitions.dev; see components/matrix.tsx). ---
+     Sixteen dots share one colour-pulse cycle; a variant is just a table of per-dot delays (--d, ms).
+     Size scales with --matrix-dot so the same mark serves the status bar (2px) and the home hero. */
+  .t-matrix {
+    --matrix-cycle: 1200ms;
+    --matrix-dot: 2px;
+    --matrix-base: var(--quiet);
+    --matrix-active: var(--ink);
+    --matrix-ease: ease-in-out;
+    display: grid;
+    width: max-content;
+    flex-shrink: 0;
+    grid-template-columns: repeat(4, var(--matrix-dot));
+    grid-auto-rows: var(--matrix-dot);
+    gap: var(--matrix-dot);
+  }
+  .t-matrix i {
+    display: block;
+    background: var(--matrix-base);
+    animation: t-matrix-pulse var(--matrix-cycle) var(--matrix-ease) infinite;
+    animation-delay: calc(var(--d, 0) * 1ms);
+    transition: background-color var(--dur-slow) var(--ease-out);
+  }
+  /* Hole positions (rounded variants) render nothing. */
+  .t-matrix i.is-gap { visibility: hidden; animation: none; }
+  @keyframes t-matrix-pulse {
+    0%, 45%, 100% { background-color: var(--matrix-base); }
+    15%           { background-color: var(--matrix-active); }
+  }
+  /* Agent states: only "working" animates. */
+  .t-matrix[data-state="idle"] i { animation: none; background: color-mix(in oklch, var(--quiet) 55%, transparent); }
+  .t-matrix[data-state="done"] i { animation: none; background: var(--ink-muted); }
+  .t-matrix[data-state="error"] i { animation: none; background: var(--danger); }
+
+  /* --- Streaming text (Transitions.dev; see components/stream.tsx). ---
+     Each word is a span that rests visible; a stream wipes them and adds .is-in word by word every
+     --stream-gap, each resolving through opacity + a small blur over --stream-fade. */
+  .t-stream {
+    --stream-gap: 60ms;
+    --stream-fade: 350ms;
+    --stream-blur: 1px;
+    --stream-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .t-stream-w {
+    opacity: 0;
+    filter: blur(var(--stream-blur));
+    transition:
+      opacity var(--stream-fade) var(--stream-ease),
+      filter var(--stream-fade) var(--stream-ease);
+  }
+  .t-stream-w.is-in {
+    opacity: 1;
+    filter: blur(0);
+  }
+  /* The wipe frame before a (re)stream: hidden instantly, no fade-out. */
+  .t-stream-w.is-wiped { transition: none; }
+
+  /* "Thinking…" label: a light band sweeps through body-coloured text while a step runs.
+     Named t-shimmer, not shimmer: shadcn/tailwind.css ships a `shimmer` utility built from
+     currentColor, and utilities outrank this layer, so a plain `.shimmer` here gets its paint
+     replaced by that one (transparent base, faint band) while keeping our keyframes. */
+  .t-shimmer {
+    background: linear-gradient(90deg, var(--body) 0%, var(--body) 35%, var(--ink) 50%, var(--body) 65%, var(--body) 100%);
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: t-shimmer 2.2s linear infinite;
+  }
+  @keyframes t-shimmer {
+    from { background-position: 120% 0; }
+    to { background-position: -120% 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .t-matrix i, .t-shimmer { animation: none !important; }
+    .t-stream-w { transition: none !important; filter: none !important; opacity: 1 !important; }
+    .t-matrix[data-state="working"] i { background: var(--ink-muted); }
+    .t-shimmer { color: var(--body); -webkit-text-fill-color: currentColor; background: none; }
+  }
+
+  /* En-dash bullets with a hanging indent, as in the brief. */
+  .slide-bullet { @apply relative pl-[1.4em]; }
+  .slide-bullet::before { content: "\2013"; @apply absolute left-[0.3em] top-0; }
+
+  .thin-scroll { scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--ink) 18%, transparent) transparent; }
+
+  /* Keyboard hint */
+  .kbd {
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded-sm border border-hairline-strong bg-raised px-1 font-mono text-2xs text-muted-foreground;
+  }
+
+  /* Focus ring shared by custom interactive elements */
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
+  }
+}
+
+/* Container-relative font size: text-cq-2 = 2cqw. Tailwind's `number` type only accepts quarter steps (1.25, 2, 2.25 ...). */
+@utility text-cq-* {
+  font-size: calc(--value(number) * 1cqw);
+}

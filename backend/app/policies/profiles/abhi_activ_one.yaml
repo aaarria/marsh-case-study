@@ -1,0 +1,30 @@
+policy_id: abhi_activ_one
+policy_name: Aditya Birla Activ One
+short_label: Policy C
+insurer: Aditya Birla Health Insurance Co. Limited
+product_uin: ADIHLIP27048V022627
+file_patterns:
+  - "ABHI*.pdf"
+variants: ["Activ One", "Activ One VIP+", "Activ One SAVR"]
+text_mode_pages: []
+skip_pages: []
+page_default_sections:
+  1: "Activ One Overview"
+  2: "Activ One Plans and Benefits"
+section_hints:
+  "THE ONE FOR THE CHOSEN ONES|VIP\\+": vip_plus
+  "SAVR": savr
+  "ABCD\\+\\+|chronic conditions": chronic_day1
+  "NO CAPPING": no_capping
+  "SUPER RELOAD": super_reload
+  "INFLATION-PROOF|Super Credit": super_credit
+  "MORE BENEFITS": more_benefits
+  "HealthReturns": health_returns
+  "CLAIM PROTECT": claim_protect
+marketing_stat_patterns:
+  - "Scan to meet"
+  - "PINCH & TURN"
+add_on_names: []
+variant_scope_patterns:
+  "VIP\\+": "Activ One VIP+ only"
+  "SAVR": "Activ One SAVR only"

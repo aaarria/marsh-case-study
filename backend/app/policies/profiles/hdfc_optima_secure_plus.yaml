@@ -1,0 +1,49 @@
+policy_id: hdfc_optima_secure_plus
+policy_name: HDFC ERGO Optima Secure+
+short_label: Policy A
+insurer: HDFC ERGO General Insurance Company Limited
+product_uin: HDFHLIP26058V082526
+file_patterns:
+  - "HDFC*.pdf"
+variants: ["Optima Secure+"]
+# Pages where plain reading-order text is more faithful than layout markdown
+text_mode_pages: []
+# Pages where PyMuPDF find_tables recovers the schedule better than layout markdown.
+# forward_fill: a merged value cell spanning several label rows is applied to each row.
+table_mode_pages:
+  11:
+    strategy: lines
+    forward_fill: true
+skip_pages: []
+page_default_sections:
+  1: "Optima Secure+ Cover"
+  15: "Legal Notice"
+  16: "Terms and Conditions"
+# Heading hints: regex -> canonical section label (applied when a heading matches)
+section_hints:
+  "Standard Exclusions": exclusions
+  "Waiting Periods": waiting_periods
+  "Terms Of Renewal": conditions
+  "Add-ons To Choose From": add_ons
+  "Discounts": discounts
+  "Why Choose HDFC ERGO": marketing_stats
+  "Schedule of Key Benefits": schedule
+  "Make Your Own Plan|Aggregate Deductible": deductible
+  "Section 41 of Insurance Act|Legal Notice": legal
+  "Terms and Conditions": conditions
+# Regexes for lines that are insurer marketing statistics (never coverage evidence)
+marketing_stat_patterns:
+  - "lives insured"
+  - "claims paid"
+  - "payout ratio"
+  - "call centre"
+  - "cashless healthcare provider network"
+add_on_names:
+  - Parenthood
+  - Limitless
+  - Serious Illness Booster
+  - "my: health Hospital Cash Benefit"
+  - Optima Wellbeing
+  - Individual Personal Accident Rider
+  - ABCD Chronic Care
+  - "my: health Critical Illness"

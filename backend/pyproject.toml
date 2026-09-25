@@ -1,0 +1,17 @@
+[project]
+name = "marsh-advisory-backend"
+version = "0.1.0"
+description = "Evidence-first insurance advisory backend (FastAPI + LangGraph + hybrid RAG)"
+requires-python = ">=3.12,<3.13"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]

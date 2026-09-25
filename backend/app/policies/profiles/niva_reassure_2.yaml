@@ -1,0 +1,30 @@
+policy_id: niva_reassure_2
+policy_name: Niva Bupa ReAssure 2.0
+short_label: Policy D
+insurer: Niva Bupa Health Insurance Company Limited
+product_uin: NBHHLIP26042V022526
+file_patterns:
+  - "Niva*.pdf"
+variants: ["Platinum+", "Titanium+"]
+text_mode_pages: []
+# Page 1 is an image-only cover (only the UIN is text)
+skip_pages: []
+page_default_sections:
+  2: "Product Benefit Table"
+section_hints:
+  "Product Benefit Table": benefit_table
+  "Niva Bupa.s Assurance": marketing_stats
+  "Optional Benefits": optional_benefits
+marketing_stat_patterns:
+  - "Lives Covered"
+  - "Network Hospitals"
+  - "Cashless Claim"
+  - "Customer Service"
+  - "30 Mins"
+add_on_names:
+  - Hospital Cash
+  - Personal Accident
+  - Safeguard
+  - Safeguard+
+  - Annual Aggregate Deductible
+  - Tiered Network

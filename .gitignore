@@ -1,0 +1,60 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.python-version
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.eggs/
+
+# Node / Next.js
+node_modules/
+.pnp
+.pnp.*
+.next/
+out/
+build/
+dist/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Vercel
+.vercel
+
+# Runtime storage. Committed knowledge base is metadata/, vector_index/, bm25_index/.
+storage/sqlite/*
+!storage/sqlite/.gitkeep
+storage/cache/
+
+# Generated run artifacts. Sample decks and audits stay in the repo.
+outputs/presentations/*
+!outputs/presentations/.gitkeep
+!outputs/presentations/sample_*
+outputs/audit_reports/*
+!outputs/audit_reports/.gitkeep
+!outputs/audit_reports/sample_*

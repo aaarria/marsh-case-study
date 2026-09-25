@@ -1,0 +1,69 @@
+[
+  {
+    "policy_id": "abhi_activ_one",
+    "policy_name": "Aditya Birla Activ One",
+    "insurer": "Aditya Birla Health Insurance Co. Limited",
+    "product_uin": "ADIHLIP27048V022627",
+    "document_path": "data/policies/ABHI Product Brochure.pdf",
+    "file_name": "ABHI Product Brochure.pdf",
+    "pages": 2,
+    "variants": [
+      "Activ One",
+      "Activ One VIP+",
+      "Activ One SAVR"
+    ],
+    "page_flags": {},
+    "short_label": "Policy C",
+    "is_group_policy": "NOT_FOUND"
+  },
+  {
+    "policy_id": "care_supreme",
+    "policy_name": "Care Health Care Supreme",
+    "insurer": "Care Health Insurance Limited",
+    "product_uin": "CHIHLIP27061V032627",
+    "document_path": "data/policies/Care Health Product Brochure.pdf",
+    "file_name": "Care Health Product Brochure.pdf",
+    "pages": 4,
+    "variants": [
+      "Care Supreme",
+      "Care Advanced (add-on)",
+      "Care OPD (add-on)"
+    ],
+    "page_flags": {},
+    "short_label": "Policy B",
+    "is_group_policy": "NOT_FOUND"
+  },
+  {
+    "policy_id": "hdfc_optima_secure_plus",
+    "policy_name": "HDFC ERGO Optima Secure+",
+    "insurer": "HDFC ERGO General Insurance Company Limited",
+    "product_uin": "HDFHLIP26058V082526",
+    "document_path": "data/policies/HDFC Product Brochure.pdf",
+    "file_name": "HDFC Product Brochure.pdf",
+    "pages": 16,
+    "variants": [
+      "Optima Secure+"
+    ],
+    "page_flags": {},
+    "short_label": "Policy A",
+    "is_group_policy": "NOT_FOUND"
+  },
+  {
+    "policy_id": "niva_reassure_2",
+    "policy_name": "Niva Bupa ReAssure 2.0",
+    "insurer": "Niva Bupa Health Insurance Company Limited",
+    "product_uin": "NBHHLIP26042V022526",
+    "document_path": "data/policies/Niva Bupa Product Brochure.pdf",
+    "file_name": "Niva Bupa Product Brochure.pdf",
+    "pages": 2,
+    "variants": [
+      "Platinum+",
+      "Titanium+"
+    ],
+    "page_flags": {
+      "1": "image_only"
+    },
+    "short_label": "Policy D",
+    "is_group_policy": "NOT_FOUND"
+  }
+]
