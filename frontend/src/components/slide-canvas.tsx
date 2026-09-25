@@ -151,6 +151,33 @@ export function SlideCanvas({ slide, index, total, disclaimer, refsByChunk = {},
 
   const subtitle = slide.subtitle && <div className="mb-[1.2cqw] shrink-0 text-cq-1.25 leading-snug text-slide-muted">{slide.subtitle}</div>;
 
+  const map = slide.layout === "map";
+  const mapItems = slide.bullets.map((b, i) => ({ b, i }));
+  const exposures = mapItems.filter((x) => x.b.kind === "company" || x.b.kind === "assumption").slice(0, 3);
+  const benefits = mapItems.filter((x) => x.b.kind === "policy").slice(0, 3);
+  const why = mapItems.find((x) => x.b.kind === "recommendation" || x.b.kind === "marsh");
+  const mapRows = Math.max(exposures.length, benefits.length, 1);
+
+  const mapCard = (item: Item | undefined, side: "exposure" | "benefit") => {
+    if (!item) return <div />;
+    const assumption = item.b.kind === "assumption";
+    const text = item.b.text.replace(/^(assumption|why this policy):\s*/i, "");
+    return (
+      <div className="flex min-h-0 flex-col justify-center border border-slide-rule bg-slide-bg px-[1.2cqw] py-[0.7cqw]" style={{ borderLeftWidth: "0.35cqw", borderLeftColor: side === "exposure" ? "var(--slide-sky)" : "var(--slide-accent)" }}>
+        <div className={cn("text-cq-0.75 font-bold uppercase tracking-wide", side === "benefit" ? "text-slide-accent" : "text-slide-muted")}>{assumption ? "Assumption" : side === "benefit" ? "Brochure benefit" : "From the profile"}</div>
+        <div className="mt-[0.3cqw] line-clamp-3 text-cq-1.25 leading-snug text-slide-ink">
+          {text}
+          {side === "benefit" && !thumb &&
+            item.b.source_chunk_ids.map((cid) => (
+              <button key={cid} type="button" className="cite ml-[0.25em]" data-active={activeCite === cid} onClick={(e) => { e.stopPropagation(); onCite?.(cid); }}>
+                {num(cid)}
+              </button>
+            ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={cn("slide-frame select-none", !thumb && "select-text", className)} aria-label={`Slide ${index + 1} of ${total}: ${slide.title}`}>
       {/* Header band: 0.9in of 7.5in */}
@@ -160,8 +187,30 @@ export function SlideCanvas({ slide, index, total, disclaimer, refsByChunk = {},
       </header>
 
       {/* Body: between the header band and the footer rule */}
-      <div className={cn("absolute inset-x-0 top-[12%] bottom-[5.4%]", !twoCol && "bg-slide-canvas")}>
-        {twoCol ? (
+      <div className={cn("absolute inset-x-0 top-[12%] bottom-[5.4%]", (!twoCol || map) && "bg-slide-canvas")}>
+        {map ? (
+          <div className="flex h-full flex-col px-[3.75%] pt-[1.6cqw] pb-[1cqw]">
+            {subtitle}
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-x-[1.2cqw] text-cq-0.75 font-bold uppercase tracking-wide text-slide-ocean">
+              <div>Client exposure</div>
+              <div />
+              <div>Stated in the brochure</div>
+            </div>
+            <div className="mt-[0.6cqw] grid min-h-0 flex-1 grid-cols-[1fr_auto_1fr] gap-x-[1.2cqw] gap-y-[0.7cqw]">
+              {Array.from({ length: mapRows }, (_, r) => (
+                <div key={r} className="contents">
+                  {mapCard(exposures[r], "exposure")}
+                  <div className="flex items-center text-slide-ocean">
+                    {exposures[r] && benefits[r] ? <span aria-hidden className="text-cq-1.75 leading-none">→</span> : null}
+                  </div>
+                  {mapCard(benefits[r], "benefit")}
+                </div>
+              ))}
+            </div>
+            {why && <div className="mt-[0.8cqw] shrink-0 bg-slide-ink px-[1.4cqw] py-[0.7cqw] text-cq-1.25 leading-snug font-semibold text-white">{why.b.text}</div>}
+            {sources}
+          </div>
+        ) : twoCol ? (
           <div className="flex h-full flex-col px-[3.75%] pt-[2.4cqw] pb-[1cqw]">
             {subtitle}
             <div className="grid min-h-0 flex-1 grid-cols-2 divide-x divide-slide-rule">

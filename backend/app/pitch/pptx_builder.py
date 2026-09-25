@@ -4,7 +4,7 @@ Brand source: the Marsh case-study brief (docs/) is itself a Marsh-branded deck,
 geometry, palette and type are the template here.
   Cover      sky #A7E2F0 field, navy MarshMcLennan wordmark top-left, Georgia title, right-aligned meta,
              ocean hero image.
-  Content    navy #000F47 header band (0.9") with a Georgia title and the white wordmark top-right;
+  Content    navy #002C77 header band (0.9") with a Georgia title and the white wordmark top-right;
              Calibri body in navy with en-dash bullets and a hanging indent; optional two columns with
              bold Calibri headers ruled in navy and a hairline divider; footer rule, navy wordmark
              bottom-left, copyright and page number bottom-right.
@@ -36,10 +36,11 @@ from app.config import get_settings
 from app.models.pitch import AuditReport, Pitch, Slide
 from app.models.policy import SourceRef
 
-# Palette sampled from the brief.
-NAVY = RGBColor(0x00, 0x0F, 0x47)
+# Marsh logo palette: navy, ocean, cyan, sky.
+NAVY = RGBColor(0x00, 0x2C, 0x77)
+OCEAN = RGBColor(0x01, 0x6D, 0x9E)
 SKY = RGBColor(0xA7, 0xE2, 0xF0)
-TEAL = RGBColor(0x00, 0xA8, 0xC7)
+TEAL = RGBColor(0x00, 0xAB, 0xC7)
 SLATE = RGBColor(0x64, 0x74, 0x8B)
 HAIRLINE = RGBColor(0xCB, 0xD5, 0xE1)
 CANVAS = RGBColor(0xF4, 0xF7, 0xFB)
@@ -286,6 +287,83 @@ def _plan_columns(slide: Slide) -> tuple[list, list, str | None, str | None]:
     return left, right, LEFT_HEADERS.get(lead, "Our view"), RIGHT_HEADER
 
 
+def _short(text: str, limit: int = 120) -> str:
+    text = " ".join(text.split())
+    if text.lower().startswith("assumption:"):
+        text = text.split(":", 1)[1].strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
+def _draw_exposure_map(slide_shape, slide: Slide, markers: dict[int, list[tuple[str, str | None]]], top, bottom) -> None:
+    """Slide 3 of the deck: exposures on the left, brochure benefits on the right, one why-line.
+
+    Policy text in the boxes is the audited bullet, clipped only for the shape. Citation markers
+    stay on the benefit cards so a figure can still be opened in the brochure.
+    """
+    indexed = list(enumerate(slide.bullets))
+    exposures = [(i, b) for i, b in indexed if b.kind in {"company", "assumption"}][:3]
+    benefits = [(i, b) for i, b in indexed if b.kind == "policy"][:3]
+    why = next((b for _, b in indexed if b.kind in {"recommendation", "marsh"}), None)
+    rows = max(len(exposures), len(benefits), 1)
+    why_h = Inches(0.62) if why else Inches(0)
+    gap = Inches(0.1)
+    region_bottom = bottom - why_h - (Inches(0.12) if why else 0)
+    chrome = Inches(0.3) + (Inches(0.34) if slide.subtitle else 0)
+    avail = region_bottom - top - chrome
+    row_h = min(Inches(1.15), (avail - gap * (rows - 1)) / rows)
+    if row_h < Inches(0.7):
+        row_h = Inches(0.7)
+
+    if slide.subtitle:
+        _text(slide_shape, MARGIN, top, CONTENT_W, Inches(0.28), slide.subtitle, 12, SLATE)
+        top += Inches(0.34)
+
+    left_x, left_w = MARGIN, Inches(5.35)
+    arrow_w = Inches(0.42)
+    right_x = left_x + left_w + Inches(0.7)
+    right_w = W - MARGIN - right_x
+    _text(slide_shape, left_x, top, left_w, Inches(0.24), "Client exposure", 11, OCEAN, bold=True)
+    _text(slide_shape, right_x, top, right_w, Inches(0.24), "Stated in the brochure", 11, OCEAN, bold=True)
+    top += Inches(0.3)
+
+    for r in range(rows):
+        y = top + r * (row_h + gap)
+        if r < len(exposures):
+            i, b = exposures[r]
+            _card(slide_shape, left_x, y, left_w, row_h)
+            _rect(slide_shape, left_x, y, Inches(0.08), row_h, SKY)
+            label = "Assumption" if b.kind == "assumption" else "From the profile"
+            _text(slide_shape, left_x + Inches(0.22), y + Inches(0.08), left_w - Inches(0.34), Inches(0.2), label, 9, SLATE, bold=True)
+            _text(slide_shape, left_x + Inches(0.22), y + Inches(0.28), left_w - Inches(0.34), row_h - Inches(0.36), _short(b.text), 12, NAVY)
+        if r < len(benefits):
+            i, b = benefits[r]
+            _card(slide_shape, right_x, y, right_w, row_h)
+            _rect(slide_shape, right_x, y, Inches(0.08), row_h, TEAL)
+            _text(slide_shape, right_x + Inches(0.22), y + Inches(0.08), right_w - Inches(0.34), Inches(0.2), "Brochure benefit", 9, TEAL, bold=True)
+            tb = _textbox(slide_shape, right_x + Inches(0.22), y + Inches(0.28), right_w - Inches(0.34), row_h - Inches(0.36))
+            p = tb.text_frame.paragraphs[0]
+            _run(p, _short(b.text), 12, NAVY)
+            for m, (num, link) in enumerate(markers.get(i, [])):
+                _run(p, (" " if m == 0 else ",") + num, 12, TEAL, superscript=True, link=link)
+        if r < len(exposures) and r < len(benefits):
+            mid_y = y + row_h / 2 - Inches(0.11)
+            arrow_x = left_x + left_w + Inches(0.14)
+            shp = slide_shape.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, arrow_x, mid_y, arrow_w, Inches(0.22))
+            shp.fill.solid()
+            shp.fill.fore_color.rgb = OCEAN
+            shp.line.fill.background()
+            shp.shadow.inherit = False
+
+    if why:
+        bar_y = top + rows * (row_h + gap) + Inches(0.06)
+        if bar_y + why_h > bottom:
+            bar_y = bottom - why_h
+        _rect(slide_shape, MARGIN, bar_y, CONTENT_W, why_h, NAVY)
+        _text(slide_shape, MARGIN + Inches(0.2), bar_y, CONTENT_W - Inches(0.4), why_h, _short(why.text, 180), 13, WHITE, bold=True, anchor=MSO_ANCHOR.MIDDLE)
+
+
 def _fit(items_left: list[str], items_right: list[str], width_left_in: float, width_right_in: float, avail_in: float, header_in: float) -> float | None:
     for size in BODY_SIZES:
         hl = header_in + _block_height_in(items_left, size, width_left_in)
@@ -349,6 +427,14 @@ def build_pitch_deck(pitch: Pitch, refs_by_chunk: dict[str, SourceRef], out_path
             markers[i] = [_number(c) for c in dict.fromkeys(cites)]
         if not refs and slide.footnote:
             refs.append((slide.footnote, None))
+
+        if slide.layout == "map":
+            _rect(s, 0, 0, W, H, CANVAS)
+            _header(s, slide.title, f"{page} / {total}")
+            _footer(s, page, total, now.year, pitch.disclaimer)
+            ref_top = _references(s, refs, FOOTER_Y - Inches(0.1), MARGIN, CONTENT_W)
+            _draw_exposure_map(s, slide, markers, HEADER_H + Inches(0.18), ref_top - Inches(0.1))
+            continue
 
         left, right, left_header, right_header = _plan_columns(slide)
         idx = {id(b): i for i, b in enumerate(slide.bullets)}

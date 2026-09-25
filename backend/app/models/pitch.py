@@ -22,7 +22,7 @@ class Slide(BaseModel):
     subtitle: str | None = None
     bullets: list[SlideBullet] = Field(default_factory=list)
     footnote: str | None = None
-    layout: str = "bullets"  # title | bullets | two_column | recommendation
+    layout: str = "bullets"  # bullets | two_column | recommendation | map
 
 
 class Pitch(BaseModel):
