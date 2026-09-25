@@ -36,6 +36,23 @@ def _policy_ids(requested: list[str] | None) -> list[str]:
     return requested
 
 
+@router.get("/debug/recommendation")
+def debug_recommendation(company: str = Query(min_length=2, max_length=120), priorities: str = Query(default="")):
+    """Score every ingested policy for this client. Winner is the highest calculated score."""
+    from app.policies.extraction import get_policy_facts
+    from app.policy_fit.explain import explain_recommendation
+
+    docs = {d.policy_id: d for d in store().list_policies()}
+    if not docs:
+        raise HTTPException(503, "Policies are not ingested.")
+    prios = [p.strip() for p in priorities.split(",") if p.strip()][:12]
+    try:
+        results = get_policy_facts(list(docs))
+    except Exception as exc:
+        raise HTTPException(503, f"Policy evidence is not available: {exc}")
+    return explain_recommendation(company, prios, results, docs)
+
+
 @router.get("/health")
 def health():
     settings = get_settings()

@@ -117,6 +117,76 @@ def test_exposures_map_to_features():
     assert "waiting_period_ped" in run_keys and "chronic_conditions_day1" in run_keys
 
 
+POLICIES = {
+    "abhi_activ_one": "ABHI Activ One",
+    "care_supreme": "Care Supreme",
+    "hdfc_optima_secure_plus": "HDFC ERGO Optima Secure+",
+    "niva_reassure_2": "Niva Bupa ReAssure 2.0",
+}
+
+BASELINE_FEATURES = [
+    "in_patient_hospitalisation", "room_rent", "restore_recharge",
+    "waiting_period_initial", "waiting_period_ped", "chronic_conditions_day1",
+    "non_medical_expenses_cover", "copay",
+]
+
+
+def _brochure(pid: str, covered: set[str], excluded: set[str]) -> dict[str, FeatureFact]:
+    facts = {}
+    for feature in BASELINE_FEATURES + ["maternity", "waiting_period_specific", "ayush"]:
+        if feature in covered:
+            facts[feature] = _fact(pid, feature, CoverageStatus.COVERED, value="Stated in the brochure")
+        elif feature in excluded:
+            facts[feature] = _fact(pid, feature, CoverageStatus.EXCLUDED, value="Listed under exclusions")
+        else:
+            facts[feature] = _fact(pid, feature, CoverageStatus.NOT_FOUND)
+    return facts
+
+
+def _priority_results():
+    """Same baseline evidence. Care states maternity; HDFC states AYUSH and excludes maternity."""
+    now = datetime.now(timezone.utc).isoformat()
+    books = {
+        "abhi_activ_one": _brochure("abhi_activ_one", set(BASELINE_FEATURES), set()),
+        "care_supreme": _brochure("care_supreme", set(BASELINE_FEATURES) | {"maternity", "waiting_period_specific"}, {"ayush"}),
+        "hdfc_optima_secure_plus": _brochure("hdfc_optima_secure_plus", set(BASELINE_FEATURES) | {"ayush"}, {"maternity"}),
+        "niva_reassure_2": _brochure("niva_reassure_2", set(BASELINE_FEATURES), set()),
+    }
+    return {pid: PolicyExtractionResult(policy_id=pid, facts=facts, generated_at=now) for pid, facts in books.items()}
+
+
+def _docs():
+    return {pid: PolicyDocument(policy_id=pid, policy_name=name, insurer=name, document_path="p", file_name="f") for pid, name in POLICIES.items()}
+
+
+def test_priorities_change_the_recommendation():
+    from app.policy_fit.explain import explain_recommendation
+
+    results = _priority_results()
+    docs = _docs()
+    maternity = explain_recommendation("Acme", ["maternity"], results, docs)
+    ayush = explain_recommendation("Acme", ["ayush"], results, docs)
+    assert maternity["recommended_policy"] == "Care Supreme"
+    assert ayush["recommended_policy"] == "HDFC ERGO Optima Secure+"
+    assert maternity["recommended_policy"] != ayush["recommended_policy"]
+    scores = {name: row["score"] for name, row in maternity["policies"].items()}
+    assert maternity["recommended_policy"] == max(scores, key=scores.get)
+    for name in POLICIES.values():
+        row = maternity["policies"][name]
+        assert set(row["components"]) == {"exposure_coverage", "evidence_strength", "exclusion_risk", "uncertainty"}
+
+
+def test_tie_does_not_prefer_hdfc():
+    now = datetime.now(timezone.utc).isoformat()
+    facts = {pid: _brochure(pid, set(BASELINE_FEATURES), set()) for pid in ("hdfc_optima_secure_plus", "abhi_activ_one")}
+    results = {pid: PolicyExtractionResult(policy_id=pid, facts=f, generated_at=now) for pid, f in facts.items()}
+    scenarios = build_scenarios(_exposures())
+    outcomes = run_arena(scenarios, results)
+    fits = score_all(["hdfc_optima_secure_plus", "abhi_activ_one"], scenarios, outcomes, [])
+    assert fits[0].score == fits[1].score
+    assert fits[0].policy_id == "abhi_activ_one"
+
+
 def test_silence_does_not_beat_documented_coverage():
     """A brochure that mentions few scenarios (all covered) must not outscore one that documents most of them."""
     from app.models.fit import Scenario, ScenarioOutcome

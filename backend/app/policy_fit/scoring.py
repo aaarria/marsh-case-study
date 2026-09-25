@@ -60,7 +60,9 @@ def score_policy(policy_id: str, scenarios: list[Scenario], outcomes: list[Scena
 
 def score_all(policy_ids: list[str], scenarios: list[Scenario], outcomes: list[ScenarioOutcome], gaps: list[PolicyGap]) -> list[PolicyFitResult]:
     results = [score_policy(pid, scenarios, outcomes, gaps) for pid in policy_ids]
-    results.sort(key=lambda r: -r.score)
+    # Highest score wins. An exact tie breaks on policy id, not on catalog order
+    # (HDFC is filed as "Policy A", so a stable sort would have preferred it).
+    results.sort(key=lambda r: (-r.score, r.policy_id))
     for r in results:
         r.close_call_with = [o.policy_id for o in results if o.policy_id != r.policy_id and abs(o.score - r.score) <= 5.0]
     return results
