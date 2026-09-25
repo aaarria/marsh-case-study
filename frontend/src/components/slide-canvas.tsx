@@ -180,14 +180,16 @@ export function SlideCanvas({ slide, index, total, disclaimer, refsByChunk = {},
 
   return (
     <div className={cn("slide-frame select-none", !thumb && "select-text", className)} aria-label={`Slide ${index + 1} of ${total}: ${slide.title}`}>
-      {/* Header band: 0.9in of 7.5in */}
-      <header className="absolute inset-x-0 top-0 flex h-[12%] items-center justify-between bg-slide-ink pl-[3.75%] pr-[3.75%]">
-        <h2 className="truncate pr-[3%] font-slide-serif text-cq-2 leading-none font-normal tracking-normal text-white">{slide.title}</h2>
-        <Image src="/marsh-white.png" alt="Marsh McLennan" width={1024} height={84} className="w-[18cqw] h-auto shrink-0" />
+      <header className="absolute inset-x-0 top-0 flex h-[16%] items-end justify-between bg-slide-bg px-[4.6%] pb-[1cqw]">
+        <div className="min-w-0">
+          <div className="text-cq-0.75 font-semibold tracking-wide text-slide-muted">{String(index + 2).padStart(2, "0")}</div>
+          <h2 className="truncate font-slide-serif text-cq-2.5 leading-none font-normal text-slide-ink">{slide.title}</h2>
+        </div>
+        <Image src="/marsh.png" alt="Marsh McLennan" width={1024} height={84} className="w-[14cqw] h-auto shrink-0" />
       </header>
 
       {/* Body: between the header band and the footer rule */}
-      <div className={cn("absolute inset-x-0 top-[12%] bottom-[5.4%]", (!twoCol || map) && "bg-slide-canvas")}>
+      <div className={cn("absolute inset-x-0 top-[16%] bottom-[7%]", (!twoCol || map) && "bg-slide-canvas")}>
         {map ? (
           <div className="flex h-full flex-col px-[3.75%] pt-[1.6cqw] pb-[1cqw]">
             {subtitle}
@@ -229,11 +231,9 @@ export function SlideCanvas({ slide, index, total, disclaimer, refsByChunk = {},
       </div>
 
       {/* Footer: rule at 7.1in, wordmark, disclaimer, copyright, page */}
-      <footer className="absolute inset-x-0 bottom-0 flex h-[5.4%] items-center border-t border-slide-ink pl-[3%] pr-[2.5%] text-slide-ink">
-        <Image src="/marsh.png" alt="Marsh McLennan" width={1024} height={84} className="w-[14.25cqw] h-auto shrink-0" />
-        <span className="ml-[2.2cqw] min-w-0 flex-1 truncate text-cq-0.75 leading-none text-slide-muted">{disclaimer}</span>
-        <span className="ml-[2cqw] shrink-0 truncate text-cq-1 leading-none">Copyright © {new Date().getFullYear()} Marsh. All rights reserved.</span>
-        <span className="ml-[2cqw] w-[3cqw] shrink-0 text-right text-cq-1 leading-none tabular-nums">{index + 1}</span>
+      <footer title={disclaimer} className="absolute inset-x-0 bottom-0 flex h-[7%] items-center border-t border-slide-rule px-[4.6%] text-slide-ink">
+        <span className="min-w-0 flex-1 truncate text-cq-0.75 leading-none text-slide-muted">Brochure evidence. Policy wording prevails.</span>
+        <span className="ml-[2cqw] shrink-0 text-cq-1 leading-none tabular-nums text-slide-ink">{String(index + 2).padStart(2, "0")}</span>
       </footer>
     </div>
   );

@@ -54,16 +54,17 @@
   --dur-slow: 320ms;
 
   /* --- slide (the product; Marsh's template as measured from the brief; theme-independent) ---- */
-  --slide-bg: #ffffff;
-  --slide-ink: #002c77;                   /* Marsh navy: header band, titles, body text */
-  --slide-body: #002c77;
-  --slide-muted: #64748b;                 /* slate: subtitles, sources, disclaimer */
-  --slide-rule: #cbd5e1;                  /* hairline: card border, column divider */
-  --slide-canvas: #f4f7fb;                /* light canvas behind the single-column card */
-  --slide-sky: #a7e2f0;                   /* cover background */
-  --slide-ocean: #016d9e;                 /* mid blue: diagram connectors */
-  --slide-accent: #00abc7;                /* cyan: citation markers */
-  --slide-accent-tint: #e7f7fb;
+  --slide-bg: #f8f3ef;                   /* warm ivory, the Marsh page ground */
+  --slide-ink: #000e47;                   /* midnight: headlines and anchors */
+  --slide-body: #1c1a17;
+  --slide-muted: #6b6560;
+  --slide-rule: #e3dbd4;
+  --slide-canvas: #f8f3ef;
+  --slide-sky: #b6e8f4;                   /* light blue, used as a small highlight */
+  --slide-ocean: #000e47;
+  --slide-accent: #000e47;
+  --slide-accent-tint: #b6e8f4;
+  --slide-gold: #c4a35a;
   --slide-hover: #f4f7fb;
   --font-slide-serif: "Georgia Pro", Georgia, "Times New Roman", serif;
   --font-slide-sans: Calibri, Carlito, "Segoe UI", var(--font-sans);

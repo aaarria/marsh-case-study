@@ -21,8 +21,9 @@ from app.utils.logging import get_logger
 log = get_logger(__name__)
 
 MARSH_POSITIONING = [
-    "Marsh advises on programme design, insurer negotiation and employee communication, and supports claims advocacy through the policy year.",
-    "Recommendation is evidence-first: every policy statement in this deck is traceable to the insurer brochure page cited in the footnotes.",
+    "PERSPECTIVE|See the client's risks from more than one angle.",
+    "EXPERTISE|Specialized risk and insurance advice.",
+    "CONNECTED CAPABILITIES|Broader Marsh capabilities, where the brief needs them.",
 ]
 
 SYSTEM = """You write concise, client-specific insurance pitch slides for a Marsh Client Advisor.
@@ -31,9 +32,13 @@ HARD RULES:
 2. If evidence carries conditions or a variant scope, the bullet must mention them briefly (e.g. "subject to a 36-month waiting period", "on the VIP+ variant").
 3. Statements about the company must only use COMPANY FACTS (kind=company, cite their C-ids in evidence_ids so the source pages can be linked) or be clearly framed as inferences (kind=assumption). Never invent company figures.
 4. Comparison statements against other insurers must come verbatim in meaning from COMPARISON NOTES (kind=policy, cite the evidence id of the feature if given, else leave evidence empty and use kind=recommendation).
-5. Produce exactly 4 slides, in this order: (1) Company overview: industry, size, geography and key risks, using COMPANY FACTS or kind=assumption. (2) Exposure map: up to 3 client exposures (kind=assumption or kind=company) paired with up to 3 brochure benefits (kind=policy, each citing evidence ids). End slide 2 with exactly one kind=recommendation bullet that starts with "Why this policy:" and uses only RATIONALE and COMPARISON NOTES. Do not invent figures. (3) Why Marsh and what to watch: use the MARSH POSITIONING lines verbatim as kind=marsh, then watch-outs and gaps as kind=recommendation, and assumptions as kind=assumption. (4) The one recommended policy: name it, mention the fit score only as a decision-support score, restate the labelled assumptions, and the next step of confirming policy wording.
-6. 3-5 bullets per slide, each <= 30 words, plain professional English, no marketing hyperbole, no superlatives like "best" or "guaranteed".
-7. Do not mention scores as truth; if you mention the fit score, call it a decision-support score."""
+5. Produce exactly 4 content slides. The cover is added separately. Use the pipe form LABEL|text. Each text is one short sentence, never a paragraph.
+   Slide 1 layout is the client at a glance. Title like "[Client] at a glance". Exactly three profile bullets, kind=company if a COMPANY FACT supports them else kind=assumption: INDUSTRY|…, SCALE|…, FOOTPRINT|…. Then up to four exposure cards, kind=assumption unless the exposure status is FACT: TITLE|one short line.
+   Slide 2 is the journey. Up to three exposures as TITLE|client need (kind=assumption or company). Up to three benefits as BENEFIT|what the brochure states (kind=policy, cite evidence ids, keep figures exact). One kind=recommendation bullet: WHY|one sentence on why this policy fits, from RATIONALE only. Never say "best".
+   Slide 3: the three MARSH POSITIONING lines verbatim, kind=marsh. Then up to four watch items. Tag must be WATCH, LIMIT, GAP or CONDITION. kind=policy with an evidence id when the pack states the condition; otherwise kind=recommendation and do not invent a page. A missing passage is GAP, not an exclusion.
+   Slide 4 title "One policy. Clear rationale." Subtitle is the policy name only. Bullets: SCORE|{fit}/100 as kind=recommendation; up to three reasons as REASON|one short line (kind=policy with evidence ids when the reason is a benefit, else kind=recommendation); one TRADEOFF|one limitation.
+6. No marketing hyperbole, no superlatives like "best" or "guaranteed", no AI jargon.
+7. The fit score is decision-support only. Never present it as proof of suitability."""
 
 
 class BulletOut(BaseModel):
@@ -72,44 +77,56 @@ def template_pitch(profile: CompanyProfile, exposures: list[Exposure], recommend
     """Deterministic pitch from the evidence pack (used offline and as a safe fallback)."""
     pid = pack.recommended_policy_id
     name = recommendation.policy_name
-    s1 = Slide(slide_number=1, title=f"{profile.company_name}: company overview", subtitle="Industry, size and risks. Anything without a source is labelled an assumption.", bullets=[])
-    for c in pack.company_evidence[:4]:
-        s1.bullets.append(SlideBullet(text=c.text, source_urls=c.urls, kind="company"))
-    if not s1.bullets:
-        s1.bullets.append(SlideBullet(text="Company research unavailable; context is limited to advisor inputs and is an assumption.", kind="assumption"))
+    def _clip(text: str, limit: int = 110) -> str:
+        text = " ".join(text.split())
+        return text if len(text) <= limit else text[: limit - 1].rsplit(" ", 1)[0] + "…"
 
-    s2 = Slide(
-        slide_number=2,
-        title=f"How {name} maps to the exposures",
-        subtitle="Benefits below are taken from the insurer brochure. The arrow is the mapping, not a coverage guarantee.",
-        layout="map",
-        bullets=[],
-    )
-    for e in sorted(exposures, key=lambda x: -x.priority)[:3]:
+    industry = profile.industry or "Not established"
+    scale = profile.size or "Not established"
+    footprint = profile.geography or "Not established"
+    s1 = Slide(slide_number=1, title=f"{profile.company_name} at a glance", subtitle=_clip(profile.overview or f"What we can say about {profile.company_name}, and what is still an assumption.", 140), layout="glance", bullets=[])
+    for label, value in (("INDUSTRY", industry), ("SCALE", scale), ("FOOTPRINT", footprint)):
+        known = value != "Not established"
+        s1.bullets.append(SlideBullet(text=f"{label}|{value}", kind="company" if known else "assumption"))
+    for e in sorted(exposures, key=lambda x: -x.priority)[:4]:
         kind = "company" if e.status.value == "FACT" else "assumption"
-        s2.bullets.append(SlideBullet(text=f"{e.title}: {e.description}", kind=kind))
-    for it in pack.items[:3]:
-        cond = f" Subject to: {it.conditions[0]}" if it.conditions else ""
-        scope = f" ({it.variant_scope})" if it.variant_scope else ""
-        s2.bullets.append(SlideBullet(text=f"{it.feature_label}: {it.statement}{scope}{cond}", source_chunk_ids=it.chunk_ids, policy_id=pid, kind="policy"))
-    if not any(b.kind == "policy" for b in s2.bullets):
-        s2.bullets.append(SlideBullet(text="No evidence-backed benefit statements could be established from the brochure.", kind="assumption"))
-    why = recommendation.rationale[0] if recommendation.rationale else f"{name} leads the decision-support comparison of the brochures in scope."
-    s2.bullets.append(SlideBullet(text=f"Why this policy: {why}", kind="recommendation"))
+        s1.bullets.append(SlideBullet(text=f"{e.title}|{_clip(e.description, 90)}", kind=kind))
 
-    s3 = Slide(slide_number=3, title="Why Marsh, and what to watch", subtitle="Positioning is Marsh's. Watch-outs come from the brochure comparison.", bullets=[])
+    s2 = Slide(slide_number=2, title="From exposure to benefit", subtitle=None, layout="map", bullets=[])
+    ranked = sorted(exposures, key=lambda x: -x.priority)[:3]
+    for e in ranked:
+        kind = "company" if e.status.value == "FACT" else "assumption"
+        s2.bullets.append(SlideBullet(text=f"{e.title}|{_clip(e.description, 90)}", kind=kind))
+    for it in pack.items[:3]:
+        s2.bullets.append(SlideBullet(text=f"{it.feature_label}|{_clip(it.statement, 90)}", source_chunk_ids=it.chunk_ids, policy_id=pid, kind="policy"))
+    why = recommendation.rationale[0] if recommendation.rationale else f"Selected because the brochure evidence lines up with the exposures identified for {profile.company_name}."
+    s2.bullets.append(SlideBullet(text=f"WHY|{_clip(why, 150)}", kind="recommendation"))
+
+    s3 = Slide(slide_number=3, title="Why Marsh", subtitle=None, layout="perspective", bullets=[])
     for line in MARSH_POSITIONING:
         s3.bullets.append(SlideBullet(text=line, kind="marsh"))
-    for n in pack.comparison_notes[:2]:
-        s3.bullets.append(SlideBullet(text=n, kind="recommendation"))
-    for g in pack.gaps[:2]:
-        s3.bullets.append(SlideBullet(text=f"Watch-out: {g}", kind="recommendation"))
+    for it in pack.items:
+        if not it.conditions:
+            continue
+        s3.bullets.append(SlideBullet(text=f"CONDITION|{it.feature_label}: {_clip(it.conditions[0], 80)}", source_chunk_ids=it.chunk_ids[:1], policy_id=pid, kind="policy"))
+        if sum(1 for b in s3.bullets if b.kind != "marsh") >= 4:
+            break
+    for g in pack.gaps:
+        if sum(1 for b in s3.bullets if b.kind != "marsh") >= 4:
+            break
+        low = g.lower()
+        tag = "GAP" if any(w in low for w in ("does not address", "cannot be confirmed", "not found", "unknown")) else "LIMIT" if any(w in low for w in ("capped", "limit")) else "CONDITION" if "condition" in low or "subject to" in low else "WATCH"
+        s3.bullets.append(SlideBullet(text=f"{tag}|{_clip(g, 90)}", kind="recommendation"))
 
-    s4 = Slide(slide_number=4, title=f"Recommended policy: {name}", subtitle="One recommendation, for advisor review before anything reaches the client.", bullets=[])
-    s4.bullets.append(SlideBullet(text=f"Recommend {name}. Fit score {recommendation.fit_score}/100 is decision-support only, not a measure of coverage.", kind="recommendation"))
-    for a in pack.assumptions[:2]:
-        s4.bullets.append(SlideBullet(text=f"Assumption: {a}", kind="assumption"))
-    s4.bullets.append(SlideBullet(text="Next step: confirm group terms and policy wording with the insurer before client presentation.", kind="recommendation"))
+    score = int(round(recommendation.fit_score))
+    s4 = Slide(slide_number=4, title="One policy. Clear rationale.", subtitle=name, layout="recommendation", bullets=[])
+    s4.bullets.append(SlideBullet(text=f"SCORE|{score}/100", kind="recommendation"))
+    for reason in recommendation.rationale[:3]:
+        s4.bullets.append(SlideBullet(text=f"REASON|{_clip(reason, 100)}", kind="recommendation"))
+    for it in pack.items[: max(0, 3 - len(recommendation.rationale))]:
+        s4.bullets.append(SlideBullet(text=f"REASON|{it.feature_label}: {_clip(it.statement, 80)}", source_chunk_ids=it.chunk_ids[:1], policy_id=pid, kind="policy"))
+    trade = next((a for a in pack.assumptions), None) or (pack.gaps[0] if pack.gaps else "Group terms are not in these brochures. Confirm wording before a client meeting.")
+    s4.bullets.append(SlideBullet(text=f"TRADEOFF|{_clip(trade, 120)}", kind="assumption"))
     return _finalise([s1, s2, s3, s4], profile.company_name, pid, version)
 
 
@@ -170,5 +187,6 @@ def generate_pitch(profile: CompanyProfile, exposures: list[Exposure], recommend
         warnings.append("LLM pitch had too few valid slides; template pitch used.")
         return template_pitch(profile, exposures, recommendation, pack, version), warnings
     slides = slides[:4]
-    slides[1].layout = "map"
+    for slide, layout in zip(slides, ("glance", "map", "perspective", "recommendation")):
+        slide.layout = layout
     return _finalise(slides, profile.company_name, pack.recommended_policy_id, version), warnings
