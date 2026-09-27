@@ -65,7 +65,7 @@ export function RecommendationChange({ runId, onChanged }: { runId: string; onCh
           {result.scores && result.scores.length > 0 && (
             <ul className="space-y-0.5 text-muted-foreground">
               {result.scores.map((row) => (
-                <li key={row.policy_id}>{row.policy_name || row.policy_id}: {row.fit_score ?? "—"} · {row.decision_state || "not scored"}</li>
+                <li key={row.policy_id}>{row.policy_name || row.policy_id}: {row.fit_score ?? "not scored"} · {row.decision_state || "not scored"}</li>
               ))}
             </ul>
           )}

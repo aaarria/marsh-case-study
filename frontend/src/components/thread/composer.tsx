@@ -27,8 +27,8 @@ export function ThreadComposer({ state, refresh, policyName }: { state: RunState
   let placeholder = "";
   let hint: React.ReactNode = null;
   let build: ((t: string) => Answer | null) | null = null;
-  if (status === "running") placeholder = "Working — you can answer when it pauses";
-  else if (status === "failed") placeholder = "Paused on an error — retry from the message above";
+  if (status === "running") placeholder = "Working. You can answer when it pauses";
+  else if (status === "failed") placeholder = "Paused on an error. Retry from the message above";
   else if (status === "approved" || status === "rejected") placeholder = "This pitch is closed. Start a new one from the rail.";
   else if (q?.question === "context") {
     placeholder = `What do you know about ${company}?`;
@@ -45,9 +45,8 @@ export function ThreadComposer({ state, refresh, policyName }: { state: RunState
       return hit ? { action: hit.id } : null;
     };
   } else if (q?.question === "review") {
-    placeholder = `Ask for changes to draft v${q.pitch_version}…`;
-    hint = 'e.g. "lead with maternity, drop the pricing bullet" — goes back to the writer and is re-audited. Approve with the button above.';
-    build = (t) => ({ action: "regenerate", feedback: t });
+    placeholder = "Edit a slide in the deck. Approval stays on the card above.";
+    hint = "Select a bullet on the slide and describe the edit. Verified facts, scores, and citations stay locked.";
   } else placeholder = "Waiting…";
 
   const enabled = !!build && !busy;

@@ -79,10 +79,10 @@ export function ContextQuestion({ runId, q, onDone }: { runId: string; q: Questi
           Use this and continue
         </Button>
         <Button size="sm" variant="outline" loading={busy === "continue"} disabled={!!busy} onClick={() => send("continue", { action: "continue" })}>
-          Continue with assumptions
+          Continue without adding details
         </Button>
       </div>
-      <p className="text-xs text-quiet">What you add is recorded as a verified advisor input and re-runs the profile. Assumptions are labelled on every slide and never audited as fact.</p>
+      <p className="text-xs text-quiet">Anything you add is recorded as provided by the advisor. Details you leave blank stay unresolved.</p>
     </QuestionFrame>
   );
 }
@@ -165,8 +165,6 @@ export function ReviewQuestion({ runId, q, state, deck, onDone }: { runId: strin
   const [reviewer, setReviewer] = useState("");
   const [note, setNote] = useState("");
   const [override, setOverride] = useState(false);
-  const [regen, setRegen] = useState(false);
-  const [feedback, setFeedback] = useState("");
   const audit = deck.preview ?? state.values.audit;
   if (!audit) return null;
   const gate = audit.summary.gate;
@@ -244,40 +242,22 @@ export function ReviewQuestion({ runId, q, state, deck, onDone }: { runId: strin
               <span>I have read the unresolved claims and take responsibility for sending this deck. The override is recorded with my name.</span>
             </label>
           )}
-          {regen && (
-            <div className="space-y-1">
-              <Label htmlFor="feedback">What should change?</Label>
-              <Textarea id="feedback" rows={3} maxLength={2000} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="e.g. Lead with maternity and day-1 chronic cover; drop the pricing slide." />
-              <p className="text-xs text-quiet">Your notes and the auditor&apos;s findings go back to the writer; the new draft is audited again before it returns here.</p>
-            </div>
-          )}
           {error && <ErrorBlock message={error} className="mb-0" />}
           <div className="flex flex-wrap gap-2">
-            {regen ? (
-              <>
-                <Button size="sm" loading={busy === "regenerate"} disabled={!!busy} onClick={() => send("regenerate", { action: "regenerate", feedback: feedback || undefined, reviewer: reviewer || undefined, note: note || undefined })}>
-                  <RefreshCw className="size-4" /> Regenerate draft
-                </Button>
-                <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => setRegen(false)}>
-                  Back
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button size="sm" loading={busy === "approve"} disabled={!!busy || !canApprove} title={stale ? "Regenerate the pitch after the recommendation change" : gate === "FAIL" && !override ? "Acknowledge the failed gate to enable approval" : needsName ? "Overrides are recorded against a reviewer name" : undefined} onClick={() => send("approve", { action: "approve", reviewer: reviewer || undefined, note: note || undefined })}>
-                  <CheckCircle2 className="size-4" /> Approve &amp; export
-                </Button>
-                <Button size="sm" variant="outline" disabled={!!busy} onClick={() => deck.startEdit(deck.idx + 1)}>
-                  <Pencil className="size-4" /> Edit slides
-                </Button>
-                <Button size="sm" variant="outline" disabled={!!busy} onClick={() => setRegen(true)}>
-                  <RefreshCw className="size-4" /> Regenerate
-                </Button>
-                <Button size="sm" variant="ghost" loading={busy === "reject"} disabled={!!busy} onClick={() => window.confirm("Reject this draft? The run ends without a deck.") && send("reject", { action: "reject", reviewer: reviewer || undefined, note: note || undefined })}>
-                  <XCircle className="size-4" /> Reject
-                </Button>
-              </>
+            <Button size="sm" loading={busy === "approve"} disabled={!!busy || !canApprove} title={stale ? "Update the pitch after the recommendation change" : gate === "FAIL" && !override ? "Acknowledge the failed gate to enable approval" : needsName ? "Overrides are recorded against a reviewer name" : undefined} onClick={() => send("approve", { action: "approve", reviewer: reviewer || undefined, note: note || undefined })}>
+              <CheckCircle2 className="size-4" /> Approve &amp; export
+            </Button>
+            <Button size="sm" variant="outline" disabled={!!busy} onClick={() => deck.startEdit(deck.idx + 1)}>
+              <Pencil className="size-4" /> Edit slides
+            </Button>
+            {stale && (
+              <Button size="sm" variant="outline" loading={busy === "regenerate"} disabled={!!busy} onClick={() => send("regenerate", { action: "regenerate", reviewer: reviewer || undefined, note: note || undefined })}>
+                <RefreshCw className="size-4" /> Update the pitch
+              </Button>
             )}
+            <Button size="sm" variant="ghost" loading={busy === "reject"} disabled={!!busy} onClick={() => window.confirm("Reject this draft? The run ends without a deck.") && send("reject", { action: "reject", reviewer: reviewer || undefined, note: note || undefined })}>
+              <XCircle className="size-4" /> Reject
+            </Button>
           </div>
         </>
       )}

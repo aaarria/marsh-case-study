@@ -13,12 +13,12 @@ _STATE = {
 }
 
 _LABEL = {
-    "COVERED": "Covered",
-    "PARTIAL": "Partial",
-    "CONDITIONAL": "Conditional",
-    "ADD_ON": "Optional add-on",
-    "EXCLUDED": "Excluded",
-    "NOT_ESTABLISHED": "Not established",
+    "COVERED": "Covered under the supplied brochure",
+    "PARTIAL": "Partially addressed in the supplied brochure",
+    "CONDITIONAL": "Available subject to stated conditions",
+    "ADD_ON": "Available as an add-on",
+    "EXCLUDED": "Excluded under the supplied brochure",
+    "NOT_ESTABLISHED": "Not established from supplied brochure",
     "REVIEW_REQUIRED": "Review required",
 }
 

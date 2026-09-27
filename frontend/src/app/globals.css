@@ -17,7 +17,7 @@
    DESIGN TOKENS
    Three foundation variables (base hue, accent, contrast) derive every surface,
    text tone and hairline in OKLCH. Chrome is achromatic and layered (Linear);
-   the slide — the product — is the only object allowed brand colour (Chronicle).
+   the slide, the product, is the only object allowed brand colour (Chronicle).
    Never use raw colour values in components: reach for a semantic token below.
    ============================================================================= */
 
@@ -110,7 +110,7 @@
 }
 
 /* ---------------------------------------------------------------------------
-   shadcn/ui contract — every primitive reads these, so it inherits the system.
+   shadcn/ui contract. Every primitive reads these, so it inherits the system.
    --------------------------------------------------------------------------- */
 :root {
   --background: var(--canvas);
@@ -131,7 +131,7 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Tailwind theme — exposes tokens as utilities (bg-panel, text-quiet, border-hairline …)
+   Tailwind theme. Exposes tokens as utilities (bg-panel, text-quiet, border-hairline …)
    and tunes the global type scale to Linear density (13px labels, 15px body, 510/590).
    --------------------------------------------------------------------------- */
 @theme inline {
@@ -341,6 +341,22 @@
     aspect-ratio: 16 / 9;
     @apply relative w-full overflow-hidden rounded-md bg-slide-bg font-slide-sans text-slide-body;
     box-shadow: var(--shadow-2);
+  }
+  /* Lay the slide out at 960px, then scale it to the pane. Thumbnails and the canvas show the same composition. */
+  .slide-stage {
+    container-type: inline-size;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    position: relative;
+  }
+  .slide-stage-scale {
+    width: 960px;
+    transform: scale(calc(100cqw / 960px));
+    transform-origin: top left;
+  }
+  .slide-stage-scale .slide-frame {
+    width: 960px;
   }
   /* --- Matrix dot loader (Transitions.dev; see components/matrix.tsx). ---
      Sixteen dots share one colour-pulse cycle; a variant is just a table of per-dot delays (--d, ms).

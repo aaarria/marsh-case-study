@@ -59,7 +59,7 @@ export function EvidenceDrawer({ runId, policyId, feature, label, onClose }: { r
           {!error && !item && <p className="text-sm text-muted-foreground">Opening the cited passage…</p>}
           {item && (
             <>
-              <StatusPill tone={item.status_label === "Excluded" ? "danger" : item.status_label === "Not established" ? "neutral" : "ok"} size="xs">
+              <StatusPill tone={item.status_label.startsWith("Excluded") ? "danger" : item.status_label.startsWith("Not established") ? "neutral" : "ok"} size="xs">
                 {item.status_label}
               </StatusPill>
               <div className="text-xs text-muted-foreground">{item.feature_label}</div>
@@ -87,7 +87,6 @@ export function EvidenceDrawer({ runId, policyId, feature, label, onClose }: { r
 
 export function RecommendationBrief({ view, runId }: { view: AdvisorView; runId: string }) {
   const rec = view.recommendation;
-  const [why, setWhy] = useState(false);
   const [maths, setMaths] = useState(false);
   const [evidence, setEvidence] = useState<{ policyId: string; feature: string; label: string } | null>(null);
   if (!rec) return null;
@@ -95,12 +94,8 @@ export function RecommendationBrief({ view, runId }: { view: AdvisorView; runId:
     <div className="space-y-2">
       {rec.automatic ? (
         <>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recommended</p>
           <p className="text-sm text-ink">{rec.policy_name}</p>
-          <p className="font-mono text-xs tabular-nums text-muted-foreground">
-            {rec.fit_score}/100
-            {rec.confidence ? ` · Confidence: ${rec.confidence[0]}${rec.confidence.slice(1).toLowerCase()}` : ""}
-            {rec.evidence_completeness != null ? ` · Evidence ${Math.round(rec.evidence_completeness * 100)}%` : ""}
-          </p>
           <p className="text-xs text-body">{rec.wording}</p>
         </>
       ) : (
@@ -111,22 +106,31 @@ export function RecommendationBrief({ view, runId }: { view: AdvisorView; runId:
       </StatusPill>
       {rec.changed_after_check && <p className="text-xs text-muted-foreground">The recommendation changed because validated evidence was added, then the same calculation was run again.</p>}
       {rec.drivers.length > 0 && (
-        <ul className="list-disc space-y-0.5 pl-4 text-xs">
-          {rec.drivers.map((d) => (
-            <li key={d}>{d}</li>
-          ))}
-        </ul>
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-ink">Recommended because</div>
+          <ol className="list-decimal space-y-0.5 pl-4 text-xs">
+            {rec.drivers.map((d) => (
+              <li key={d}>{d}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+      {rec.automatic && (
+        <p className="font-mono text-2xs tabular-nums text-quiet">
+          Fit {rec.fit_score}/100 · decision support only
+          {rec.evidence_completeness != null ? ` · evidence ${Math.round(rec.evidence_completeness * 100)}%` : ""}
+        </p>
       )}
       {rec.gaps.length > 0 && <p className="text-xs text-muted-foreground">{rec.gaps.slice(0, 3).join(" · ")}</p>}
       {(rec.requirements?.length || 0) > 0 && (
-        <details className="rounded-md border border-hairline p-2">
-          <summary className="cursor-pointer text-xs text-ink">Client requirements</summary>
+        <details className="rounded-md border border-hairline p-2" open>
+          <summary className="cursor-pointer text-xs text-ink">How the selected priorities affect the comparison</summary>
           <ul className="mt-2 space-y-2">
             {rec.requirements?.map((row) => (
               <li key={row.feature} className="text-xs">
                 <div className="font-medium text-ink">{row.concept || row.label}</div>
                 {row.concept && row.label && row.label !== row.concept && <div className="text-muted-foreground">{row.label}</div>}
-                <div className="text-muted-foreground">Weight {Math.round((row.weight || 0) * 100)}%</div>
+                <div className="text-muted-foreground">Mapped requirement: {row.concept || row.label}. Weight {Math.round((row.weight || 0) * 100)}%.</div>
                 <ul className="mt-1 space-y-0.5 text-body">
                   {row.results.map((cell) => (
                     <li key={cell.policy_id}>{cell.policy_name}: {cell.label}</li>
@@ -137,23 +141,25 @@ export function RecommendationBrief({ view, runId }: { view: AdvisorView; runId:
           </ul>
         </details>
       )}
-      {(rec.alternatives?.length || 0) > 0 && (
-        <div className="space-y-1 text-xs">
-          <div className="text-muted-foreground">Alternative fit</div>
-          {rec.alternatives?.map((alt) => (
-            <p key={alt.policy_id}>
-              {alt.policy_name} · {alt.fit_score}/100
-              {alt.trade_offs[0] ? ` · ${alt.trade_offs[0]}` : ""}
-            </p>
-          ))}
+      {rec.automatic && (
+        <div className="space-y-2 text-xs">
+          <div className="font-medium text-ink">Alternatives</div>
+          {(rec.alternatives?.length || 0) === 0 ? (
+            <p className="text-muted-foreground">No additional policy has sufficient evidence for a reliable comparison.</p>
+          ) : (
+            rec.alternatives?.map((alt, index) => (
+              <div key={alt.policy_id || index} className="rounded-md border border-hairline p-2">
+                <div className="font-medium text-ink">{index === 0 ? "Next best alternative" : "Third option"}: {alt.policy_name}</div>
+                <p className="text-quiet">Fit {alt.fit_score}/100 · decision support only</p>
+                {alt.strong_matches.length > 0 && <p>Satisfies: {alt.strong_matches.join("; ")}</p>}
+                {alt.trade_offs.length > 0 && <p>Trade-off: {alt.trade_offs.join("; ")}</p>}
+                {alt.evidence.length > 0 && <p className="text-muted-foreground">Evidence: {alt.evidence.slice(0, 2).join(" ")}</p>}
+              </div>
+            ))
+          )}
         </div>
       )}
       {(view.why?.length || 0) > 0 && (
-        <button type="button" className="focus-ring text-xs text-ink underline-offset-2 hover:underline" onClick={() => setWhy((v) => !v)}>
-          {why ? "Hide why" : "Why?"}
-        </button>
-      )}
-      {why && (
         <ul className="space-y-2">
           {view.why?.map((row) => (
             <li key={`${row.feature}-${row.requirement}`} className="rounded-md border border-hairline p-2 text-xs">
@@ -176,7 +182,7 @@ export function RecommendationBrief({ view, runId }: { view: AdvisorView; runId:
             <ul className="space-y-1 text-2xs text-quiet">
               {view.why?.map((row) => (
                 <li key={`w-${row.feature}`}>
-                  {row.requirement}: contribution {row.contribution ?? "—"}, weight {row.weight ?? "—"}
+                  {row.requirement}: contribution {row.contribution ?? "not scored"}, weight {row.weight ?? "not scored"}
                   {row.chunk_id ? ` · ${row.chunk_id}` : ""}
                 </li>
               ))}
@@ -196,8 +202,12 @@ export function ComparisonBrief({ view, runId }: { view: AdvisorView; runId: str
   return (
     <div className="space-y-2">
       <div>
-        <div className="text-sm font-medium text-ink">COVERAGE & EVIDENCE MATRIX</div>
-        <p className="text-xs text-muted-foreground">One row is a client requirement. One column is a policy. The label is the evidence state. Colour does not rank the policies, and this view does not calculate fit.</p>
+        <div className="text-sm font-medium text-ink">Policy comparison</div>
+        <p className="text-xs text-muted-foreground">
+          {comparison.baseline
+            ? "No specific client priority was selected. The comparison therefore uses the standard baseline coverage criteria."
+            : "Each row is a requirement that affects this comparison. The label is the evidence state. This view does not calculate fit."}
+        </p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[28rem] border-collapse text-left text-xs">
@@ -217,7 +227,12 @@ export function ComparisonBrief({ view, runId }: { view: AdvisorView; runId: str
                   <td key={cell.policy_id} className="px-1 py-1.5">
                     <button type="button" className="focus-ring rounded-sm text-left" title={`${cell.policy_name || cell.policy_id}: ${cell.status_label}. Open the brochure evidence.`} onClick={() => setEvidence({ policyId: cell.policy_id, feature: row.feature, label: row.label })}>
                       <StatusPill tone={STATE_TONE[cell.state || ""] || "neutral"} size="xs">{cell.status_label}</StatusPill>
-                      {cell.state && <div className="mt-0.5 font-mono text-2xs text-quiet">{cell.state}</div>}
+                      {(cell.page || cell.section) && (
+                        <div className="mt-0.5 text-2xs text-quiet">
+                          {cell.page ? `p. ${cell.page}` : ""}
+                          {cell.section ? `${cell.page ? ", " : ""}${cell.section}` : ""}
+                        </div>
+                      )}
                     </button>
                   </td>
                 ))}
@@ -310,7 +325,7 @@ export function PolicyCheckBrief({ view, runId }: { view: AdvisorView; runId: st
               {check.gaps.map((gap, i) => (
                 <li key={`${gap.kind}-${gap.feature}-${i}`}>
                   <span className="text-ink">{gap.feature}</span>
-                  {gap.policy_name ? ` · ${gap.policy_name}` : ""} — {gap.meaning}
+                  {gap.policy_name ? ` · ${gap.policy_name}` : ""}: {gap.meaning}
                 </li>
               ))}
               {check.gaps.length === 0 && <li className="text-muted-foreground">No gap was recorded.</li>}

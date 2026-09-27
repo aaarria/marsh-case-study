@@ -300,5 +300,5 @@ def test_phase5_routes_and_advisor_files_stay_symmetric(retriever):
         assert not any(token in text for token in banned), rel
     ui = "\n".join((root / rel).read_text() for rel in watched if rel.startswith("frontend"))
     assert "COVERAGE SCENARIO ANALYSIS" in ui
-    assert "COVERAGE & EVIDENCE MATRIX" in ui
+    assert "Policy comparison" in ui
     assert "ADVISORY PITCH STUDIO" in ui

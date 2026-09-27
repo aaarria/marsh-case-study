@@ -61,7 +61,7 @@ def test_rewrite_without_llm_is_unavailable_not_silent():
 
 
 def test_deck_links_brochure_pages_and_web_sources(tmp_path):
-    """Every reference in the exported deck is a hyperlink: brochure citations open the PDF at the page, company facts open the web page."""
+    """Citations stay in the deck as plain source lines. They are not hyperlinks."""
     from pptx import Presentation
 
     from app.models.pitch import Pitch, Slide, SlideBullet
@@ -76,10 +76,10 @@ def test_deck_links_brochure_pages_and_web_sources(tmp_path):
     ])
     out = build_pitch_deck(pitch, {"c1": ref}, tmp_path / "deck.pptx")
     prs = Presentation(str(out))
-    links = {i: [r.hyperlink.address for sh in s.shapes if sh.has_text_frame for p in sh.text_frame.paragraphs for r in p.runs if r.hyperlink.address] for i, s in enumerate(prs.slides)}
+    links = [r.hyperlink.address for s in prs.slides for sh in s.shapes if sh.has_text_frame for p in sh.text_frame.paragraphs for r in p.runs if r.hyperlink.address]
     texts = {i: " ".join(r.text for sh in s.shapes if sh.has_text_frame for p in sh.text_frame.paragraphs for r in p.runs) for i, s in enumerate(prs.slides)}
-    # slide 1 (company): marker + reference both point at the web page; the reference reads as host · path
-    assert links[1] == ["https://en.wikipedia.org/wiki/Acme_Corporation"] * 2 and "en.wikipedia.org · wiki/Acme Corporation" in texts[1]
-    # slide 2 (policy): marker + reference open the brochure PDF at the cited page through the API
-    assert links[2] == [f"http://localhost:8000/api/policies/{POL}/document#page=7"] * 2 and "Acme Secure brochure, p.7, Waiting Periods" in texts[2]
-    assert links[3] == [] and "Sources" not in texts[3]  # nothing cited, no reference block
+    assert links == []
+    assert "Source: en.wikipedia.org · wiki/Acme Corporation" in texts[0]
+    assert 'Source: Acme Secure, p. 7, section "Waiting Periods"' in texts[1]
+    assert "http" not in texts[1]
+    assert "Sources" not in texts[2]

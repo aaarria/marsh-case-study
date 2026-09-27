@@ -40,7 +40,7 @@ export function PassportSheet({ claim, onClose }: { claim: ClaimAudit | null; on
                       </ToneTag>
                       <span className="min-w-0 leading-snug">
                         <span className="font-medium text-ink">{titleCase(k.status.toLowerCase())}</span>
-                        <span className="text-muted-foreground"> — {k.detail}</span>
+                        <span className="text-muted-foreground">: {k.detail}</span>
                       </span>
                     </li>
                   ))}

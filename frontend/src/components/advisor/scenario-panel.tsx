@@ -10,11 +10,11 @@ import type { ScenarioCell, ScenarioResult } from "@/lib/types";
 import type { Tone } from "@/components/callout";
 
 const EXAMPLES = [
-  "The client wants strong maternity coverage.",
-  "The workforce includes employees with pre-existing diabetes.",
-  "The client wants protection against non-medical hospitalization expenses.",
-  "The client wants protection for international treatment.",
-  "The client wants high flexibility if the base sum insured is exhausted.",
+  "What happens if maternity is required?",
+  "What happens if room-rent flexibility becomes important?",
+  "What happens if chronic conditions from day one become a priority?",
+  "What happens if global treatment is important?",
+  "What happens if cost control is prioritized?",
 ];
 
 const TONE: Record<string, Tone> = {
@@ -86,7 +86,7 @@ export function ScenarioPanel({ runId }: { runId: string }) {
     <div className="mt-3 space-y-2 border-t border-hairline pt-3">
       <div>
         <div className="text-sm font-medium text-ink">COVERAGE SCENARIO ANALYSIS</div>
-        <p className="text-xs text-muted-foreground">Check how each policy addresses one client situation. The result is evidence for you. It does not change the recommendation and it does not promise a claim payment.</p>
+        <p className="text-xs text-muted-foreground">This is an informational scenario. It reads the stored brochure evidence and does not overwrite the recommendation.</p>
       </div>
       <Textarea rows={2} maxLength={500} value={text} onChange={(e) => setText(e.target.value)} aria-label="Client scenario" />
       <div className="flex flex-wrap gap-1.5">
@@ -101,6 +101,7 @@ export function ScenarioPanel({ runId }: { runId: string }) {
       {result && (
         <div className="space-y-2">
           <p className="text-xs text-body">{result.message}</p>
+          <p className="text-xs text-muted-foreground">{result.changes_recommendation ? "This scenario would change the stored recommendation." : "The current recommendation remains unchanged."}</p>
           {result.rows.map((row) => (
             <section key={row.feature} className="space-y-1">
               <div className="text-xs font-medium text-ink">{row.label}</div>

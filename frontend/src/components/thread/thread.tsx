@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Columns3, Download, FileSearch, Gauge, Globe, Hourglass, ListChecks, MessageCircleQuestion, Presentation, RotateCcw, ShieldCheck, TimerReset, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/callout";
-import { GateBadge, KindBadge, StatusPill } from "@/components/status-badge";
+import { GateBadge, StatusPill } from "@/components/status-badge";
 import { AssistantMessage, ChipRow, ToolRow, UserMessage, WorkingRow } from "@/components/thread/message";
 import { ThreadComposer } from "@/components/thread/composer";
 import { Stream, StreamScope } from "@/components/stream";
@@ -59,37 +59,44 @@ function StepMessage({ item, state, policyName, deck, refresh }: { item: Extract
       const reruns = state.events.filter((e) => e.node === "research_company" && e.status === "completed").length;
       if (item.occurrence < reruns - 1) return <ToolRow icon={Globe} summary="Profiled from the name alone (superseded below)" meta={meta} />;
       const company = state.advisor?.company;
-      const counts = company
-        ? (["VERIFIED", "ASSUMPTION", "UNKNOWN"] as const).map((k) => [k, company.facts.filter((f) => f.label === k).length] as const).filter(([, n]) => n > 0)
-        : (["FACT", "INFERENCE", "ASSUMPTION", "UNKNOWN"] as const).map((k) => [k, p.facts.filter((f) => f.kind === k).length] as const).filter(([, n]) => n > 0);
+      const verified = company ? company.facts.filter((f) => f.label === "VERIFIED").length : p.facts.filter((f) => f.kind === "FACT").length;
+      const advisor = company ? company.facts.filter((f) => f.wording === "Provided by advisor").length : 0;
+      const unresolved = company ? company.facts.filter((f) => f.label === "UNKNOWN").length : p.facts.filter((f) => f.kind === "UNKNOWN").length;
       const webFacts = p.facts.filter((f) => f.kind === "FACT" && f.sources.some((x) => /^https?:/.test(x.url))).length;
       const count = webFacts > 0 ? ` · ${webFacts} web-sourced fact${webFacts === 1 ? "" : "s"}` : "";
       const summary =
         p.research_status === "RESEARCH_COMPLETE" || p.research_status === "OK"
           ? `Company research complete${count}`
           : p.research_status === "RESEARCH_PARTIAL"
-            ? "Research partially completed"
+            ? "Limited public information found"
             : p.research_status === "NO_VERIFIED_SOURCE"
-              ? "Research attempted — no verified public source found"
+              ? "No verified public source found"
               : p.research_status === "RESEARCH_DISABLED"
                 ? "Web research is off"
                 : p.research_status === "RESEARCH_FAILED"
-                  ? "Company research could not be completed"
+                  ? "Research unavailable"
                   : `Researched ${p.company_name}${count}`;
       const note = p.research_note && !/HTTP\s*\d{3}/i.test(p.research_note) ? p.research_note : null;
       return (
         <ToolRow icon={Globe} summary={summary} meta={meta}>
           {p.overview && <p><Stream text={p.overview} /></p>}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {counts.map(([k, n]) => (
-              <span key={k} className="flex items-center gap-1 text-xs">
-                <KindBadge kind={k} /> {n}
-              </span>
-            ))}
-          </div>
+          <p className="text-xs text-muted-foreground">
+            {[
+              verified ? `${verified} verified from a public source` : "",
+              advisor ? `${advisor} provided by the advisor` : "",
+              unresolved ? `${unresolved} not established from available sources` : "",
+            ].filter(Boolean).join(". ")}
+            {(verified || advisor || unresolved) ? "." : ""}
+          </p>
           <ChipRow items={[p.industry, p.size, p.geography, p.workforce].filter((x): x is string => !!x && x.toLowerCase() !== "unknown")} />
           {note && <p className="text-xs text-muted-foreground"><Stream text={note} /></p>}
-          {company?.market && company.market.status !== "OK" && <p className="text-xs text-muted-foreground">Industry context is unknown. It is not used as a policy score.</p>}
+          {company?.market && company.market.status !== "OK" && (
+            <p className="text-xs text-muted-foreground">
+              {p.research_status === "RESEARCH_PARTIAL" || p.research_status === "NO_VERIFIED_SOURCE"
+                ? "Public-source coverage is limited for this company. Unverified details have not been inferred."
+                : "Industry context was not established from available sources. It is not used as a policy score."}
+            </p>
+          )}
         </ToolRow>
       );
     }
@@ -97,22 +104,22 @@ function StepMessage({ item, state, policyName, deck, refresh }: { item: Extract
       const market = state.advisor?.company?.market;
       return (
         <ToolRow icon={Globe} summary="Read the industry context" meta={meta}>
-          <p className="text-xs text-muted-foreground">{market?.context || market?.note || "Industry context is unknown. It does not change the recommendation."}</p>
-          {market?.hypotheses?.length ? <p className="text-xs">Working assumptions only: {market.hypotheses.join(" ")}</p> : null}
+          <p className="text-xs text-muted-foreground">{market?.context || market?.note || "Industry context was not established from available sources. It does not change the recommendation."}</p>
+          {market?.hypotheses?.length ? <p className="text-xs">Working hypothesis. Not used as a verified policy requirement. {market.hypotheses.join(" ")}</p> : null}
         </ToolRow>
       );
     }
     case "map_exposures": {
       const labelled = state.advisor?.company?.exposures;
-      const ex = labelled || (v.exposures || []).map((e) => ({ title: e.title, description: e.description, label: e.status, rationale: e.reasoning }));
+      const ex = labelled || (v.exposures || []).map((e) => ({ title: e.title, description: e.description, label: e.status, wording: "", rationale: e.reasoning }));
       return (
         <ToolRow icon={ListChecks} summary={`Mapped ${ex.length} health-cover need${ex.length === 1 ? "" : "s"}`} meta={meta}>
           <ul className="space-y-1">
             {ex.slice(0, 6).map((e) => (
               <li key={e.title} className="flex items-start gap-2">
-                <KindBadge kind={e.label} className="mt-0.5 shrink-0" />
+                <span className="mt-0.5 shrink-0 text-2xs text-quiet">{e.wording || (e.label === "VERIFIED" ? "Verified from public source" : e.label === "UNKNOWN" ? "Not established from available sources" : "Working hypothesis")}</span>
                 <span>
-                  <span className="text-ink">{e.title}</span> <span className="text-muted-foreground">— <Stream text={e.description} /></span>
+                  <span className="text-ink">{e.title}</span> <span className="text-muted-foreground">: <Stream text={e.description} /></span>
                 </span>
               </li>
             ))}
@@ -236,7 +243,7 @@ function StepMessage({ item, state, policyName, deck, refresh }: { item: Extract
   }
 }
 
-const ANSWER_LABEL: Record<string, string> = { continue: "Continue with assumptions", add_context: "Added what I know", keep: "Let the score decide", approve: "Approved", edit: "Saved edits — re-audit", regenerate: "Regenerate", reject: "Rejected" };
+const ANSWER_LABEL: Record<string, string> = { continue: "Continue with assumptions", add_context: "Added what I know", keep: "Let the score decide", approve: "Approved", edit: "Saved edits. Re-audit.", regenerate: "Regenerate", reject: "Rejected" };
 const QUESTION_LABEL: Record<string, string> = { context: "Asked for client context", close_call: "Asked which policy to pitch (close call)", review: "Asked for your review" };
 
 function AnsweredQuestion({ item, state, policyName }: { item: Extract<ThreadItem, { kind: "question" }>; state: RunState; policyName: (id?: string | null) => string }) {
@@ -282,7 +289,7 @@ function FailureMessage({ run, onRetry, retrying, retryError }: { run: RunSummar
     </Button>
   );
   return (
-    <Callout tone={quota || interrupted ? "warn" : "danger"} icon={interrupted ? Unplug : quota ? TimerReset : undefined} title={interrupted ? "Interrupted by a server restart" : quota ? "Gemini free-tier limit reached — paused, not lost" : "This step failed"} actions={retryBtn}>
+    <Callout tone={quota || interrupted ? "warn" : "danger"} icon={interrupted ? Unplug : quota ? TimerReset : undefined} title={interrupted ? "Interrupted by a server restart" : quota ? "Gemini free-tier limit reached. Paused, not lost." : "This step failed"} actions={retryBtn}>
       <span className="break-words">{run.error}</span>
       <p className="mt-1 text-xs text-muted-foreground">{quota ? `Progress is checkpointed; retrying resumes from the failed step with the same model. Retrying before the reset hits the same limit again.${run.retry_after != null ? ` Expected reset: ${formatWait(remaining)}.` : ""}` : "Completed steps are kept. Retrying re-runs only the step that failed."}</p>
       {retryError && <p className="mt-1 text-xs font-medium">Retry failed: {retryError}</p>}
@@ -386,7 +393,7 @@ export function Thread({ state, deck, policyName, refresh }: { state: RunState; 
         {status === "failed" && <FailureMessage run={state.run} onRetry={onRetry} retrying={retrying} retryError={retryError} />}
         {status === "awaiting_review" && !q && (
           <StatusPill tone="warn" size="xs">
-            Waiting on a question that is no longer pending — reload.
+            Waiting on a question that is no longer pending. Reload.
           </StatusPill>
         )}
       </div>

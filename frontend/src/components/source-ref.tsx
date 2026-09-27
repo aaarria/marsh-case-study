@@ -32,7 +32,7 @@ export function SourceChip({ src, className }: { src: SourceRef; className?: str
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-base">
-              {src.policy_name || src.policy_id} — page {src.page}
+              {src.policy_name || src.policy_id}, page {src.page}
             </DialogTitle>
             <DialogDescription className="flex flex-wrap gap-2 text-xs">
               {src.section && <span>Section: {src.section}</span>}

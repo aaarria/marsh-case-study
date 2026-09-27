@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
-import { Matrix } from "@/components/matrix";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Chip, ChipGroup } from "@/components/chip";
 import { ErrorBlock } from "@/components/states";
 import { SystemNotice } from "@/components/system-notice";
@@ -67,11 +67,21 @@ export default function Composer() {
         <div className="w-full max-w-2xl space-y-6">
           {readiness.error && <ErrorBlock message={readiness.error} title="API unavailable" />}
           <SystemNotice r={readiness} detailed />
-          <div className="pt-6 text-center">
-            {/* The system's mark: the same dot matrix as the status bar, at hero scale. It twinkles while the run is being started and otherwise holds still. */}
-            <Matrix variant="twinkle" state={submitting ? "working" : "done"} dot={6} rounded className="mx-auto mb-8" title={submitting ? "Starting the run" : "Ready"} />
-            <h1 className="display text-3xl sm:text-4xl">Who are we pitching?</h1>
-            <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">AI researches the company. Policy coverage is grounded in the supplied brochures. Unknowns remain unknown.</p>
+          <div className="pt-2 text-center">
+            <h1 className="display text-3xl sm:text-4xl">Marsh Health Policy Advisory</h1>
+            <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">Evidence-led health insurance comparison and advisory system</p>
+            <details className="mx-auto mt-4 max-w-md text-left">
+              <summary className="cursor-pointer text-sm text-ink">Who are we advising?</summary>
+              <p className="mt-2 text-sm text-muted-foreground">The comparison follows the client&apos;s stated priorities, the wording in the supplied brochures, and the existing recommendation logic. Unresolved points stay unresolved.</p>
+              <ol className="mt-3 space-y-1 text-sm text-muted-foreground">
+                <li>1. Enter the company</li>
+                <li>2. Research the company</li>
+                <li>3. Select client priorities</li>
+                <li>4. Compare the policies</li>
+                <li>5. Receive a recommendation and alternatives</li>
+                <li>6. Build the advisory pitch</li>
+              </ol>
+            </details>
           </div>
 
           <form
@@ -111,62 +121,71 @@ export default function Composer() {
                   </Chip>
                 ))}
               </ChipGroup>
-              <p className="mt-1.5 text-2xs text-quiet">Selected priorities directly shape policy fit.</p>
+              <p className="mt-1.5 text-2xs text-quiet">Selected priorities directly shape policy fit. Leave them empty for a baseline comparison.</p>
             </div>
 
-            <div className="border-t border-hairline px-3 py-2">
-              <ChipGroup label="Policies in scope">
-                {policies.length === 0 && <span className="text-xs text-quiet">Loading brochures…</span>}
+            <div className="border-t border-hairline px-3 py-3">
+              <p className="text-sm text-ink">Select the policy brochures to compare</p>
+              <p className="mt-1 text-2xs text-quiet">{policies.length === 0 ? "Loading the ingested brochures…" : `Comparing ${selected.length} ingested brochure${selected.length === 1 ? "" : "s"}.`}</p>
+              {tooFew && <p className="tone-danger tint-text mt-1.5 text-xs">Keep at least {MIN_POLICIES} policies: a recommendation needs something to be compared against.</p>}
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {policies.map((p) => {
                   const on = selected.includes(p.policy_id);
                   return (
-                    <Chip key={p.policy_id} size="xs" selected={on} onClick={() => setSelected((s) => (s.includes(p.policy_id) ? s.filter((x) => x !== p.policy_id) : [...s, p.policy_id]))} title={`${p.insurer} · ${p.pages} pages · Ready · ${on ? "Selected" : "Not selected"}`}>
-                      {p.policy_name}
-                      <span className="ml-1 text-quiet">{on ? "Ready · Selected" : "Ready · Not selected"}</span>
-                    </Chip>
+                    <button
+                      key={p.policy_id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setSelected((s) => (s.includes(p.policy_id) ? s.filter((x) => x !== p.policy_id) : [...s, p.policy_id]))}
+                      className={cn("flex min-h-16 flex-col items-start justify-between border px-3 py-2 text-left", on ? "border-marsh-navy bg-marsh-navy text-white" : "border-hairline-strong bg-transparent text-ink")}
+                    >
+                      <span className={cn("text-2xs font-semibold tracking-wide", on ? "text-white/80" : "text-quiet")}>{on ? "SELECTED" : "NOT SELECTED"}</span>
+                      <span className="text-sm font-medium">{p.policy_name}</span>
+                    </button>
                   );
                 })}
-              </ChipGroup>
-              <p className="mt-1.5 text-2xs text-quiet">Ready means the supplied brochure is ingested. Selected means it is in this comparison. Uploading a file does not add it.</p>
-              {tooFew && <p className="tone-danger tint-text mt-1.5 text-xs">Keep at least {MIN_POLICIES} policies: a recommendation needs something to be compared against.</p>}
-              <label className="mt-2 inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  className="sr-only"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = "";
-                    if (!file) return;
-                    setError(null);
-                    try {
-                      const stored = await api.uploadPolicy(file);
-                      setUploadNote(stored.message);
-                      const rows = await api.policyUploads();
-                      setUploads(rows.uploads);
-                    } catch (err) {
-                      setUploadNote(null);
-                      setError(err instanceof ApiError ? err.message : "That file could not be stored.");
-                    }
-                  }}
-                />
-                Store another PDF separately
-              </label>
-              {uploadNote && <p className="mt-1.5 text-xs text-muted-foreground">{uploadNote}</p>}
-              {uploads.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {uploads.map((row, index) => (
-                    <li key={`${row.original_name}-${index}`} className="text-xs text-muted-foreground">
-                      {row.original_name} · {row.status === "Failed" ? "Failed" : "Uploaded"} · Not selected · Not in the four-policy comparison
-                    </li>
-                  ))}
-                </ul>
-              )}
+              </div>
+              <div className="mt-3">
+                <label className="inline-flex cursor-pointer border border-hairline-strong px-3 py-2 text-sm text-ink">
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="sr-only"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      setError(null);
+                      try {
+                        const stored = await api.uploadPolicy(file);
+                        setUploadNote(stored.message);
+                        const rows = await api.policyUploads();
+                        setUploads(rows.uploads);
+                      } catch (err) {
+                        setUploadNote(null);
+                        setError(err instanceof ApiError ? err.message : "That file could not be stored.");
+                      }
+                    }}
+                  />
+                  + Add another policy
+                </label>
+                <p className="mt-1 text-2xs text-quiet">Upload an external brochure. It is stored for the evidence workflow and is not added to this comparison until it has been ingested.</p>
+                {uploadNote && <p className="mt-1.5 text-xs text-muted-foreground">{uploadNote}</p>}
+                {uploads.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {uploads.map((row, index) => (
+                      <li key={`${row.original_name}-${index}`} className="text-xs text-muted-foreground">
+                        {row.original_name} · {row.status === "Failed" ? "Could not be stored" : "Stored"} · not in this comparison
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </form>
 
           {error && <ErrorBlock message={error} title="Cannot start" />}
-          <p className="text-center text-xs text-quiet">Nothing is exported until you approve. Unknown stays unknown; the system never fills a gap with an invented figure.</p>
+          <p className="text-center text-xs text-quiet">Recommendations are based on the evidence available in the supplied policy documents. Information that cannot be established remains clearly identified.</p>
         </div>
       </main>
     </AppShell>

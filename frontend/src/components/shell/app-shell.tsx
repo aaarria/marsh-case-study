@@ -45,8 +45,8 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
     <div className="flex h-dvh bg-canvas">
       <aside className="flex w-56 shrink-0 flex-col border-r border-[#e4ddd6] bg-marsh-cream text-marsh-navy">
         <div className="flex h-12 items-center px-4">
-          <Link href="/" className="focus-ring flex items-center gap-2 rounded-md" aria-label="Marsh Advisory — home">
-            <Image src="/marsh.png" alt="Marsh McLennan" width={1024} height={84} priority className="h-4 w-auto" />
+          <Link href="/" className="focus-ring flex items-center gap-2 rounded-md" aria-label="Marsh Health Policy Advisory, home">
+            <Image src="/marsh.png" alt="Marsh" width={1176} height={400} priority className="h-8 w-auto" />
           </Link>
         </div>
         <div className="px-3 pb-2">
@@ -98,7 +98,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
           {h && (
             <>
               <span className="text-hairline-bright">|</span>
-              <span className="truncate" title="GEMINI_MODEL — the only model used; never switched">
+              <span className="truncate" title="GEMINI_MODEL, the only model used; never switched">
                 {h.llm_configured ? h.llm_model : "no Gemini key"}
                 {h.llm_configured && !h.model_free_tier_known && <span className="tone-warn tint-text"> · not on the free-tier list</span>}
               </span>

@@ -11,14 +11,14 @@ from app.advisory.states import coverage_label, coverage_state
 from app.policies.features import FEATURE_LABELS
 
 _STATUS = {
-    "COVERED": "Covered",
-    "PARTIALLY_COVERED": "Conditional",
-    "CONDITIONAL": "Conditional",
-    "ADD_ON": "Optional add-on",
-    "EXCLUDED": "Excluded",
-    "NOT_FOUND": "Not specified in supplied brochure",
-    "UNKNOWN": "Not specified in supplied brochure",
-    "REVIEW_REQUIRED": "Needs review",
+    "COVERED": "Covered under the supplied brochure",
+    "PARTIALLY_COVERED": "Available subject to stated conditions",
+    "CONDITIONAL": "Available subject to stated conditions",
+    "ADD_ON": "Available as an add-on",
+    "EXCLUDED": "Excluded under the supplied brochure",
+    "NOT_FOUND": "Not established from supplied brochure",
+    "UNKNOWN": "Not established from supplied brochure",
+    "REVIEW_REQUIRED": "Review required",
 }
 
 _DECISION = {
@@ -31,6 +31,12 @@ _DECISION = {
 }
 
 _FACT = {"FACT": "VERIFIED", "INFERENCE": "ASSUMPTION", "ASSUMPTION": "ASSUMPTION", "UNKNOWN": "UNKNOWN"}
+_FACT_WORDING = {
+    "VERIFIED": "Verified from public source",
+    "ASSUMPTION": "Working hypothesis. Not used as a verified policy requirement",
+    "UNKNOWN": "Not established from available sources",
+    "ADVISOR": "Provided by advisor",
+}
 
 _GAP = {
     "EXPLICIT_GAP": "Not covered",
@@ -110,7 +116,7 @@ def lookup_evidence(values: dict[str, Any], policy_id: str, feature: str) -> dic
         "feature": feature,
         "feature_label": FEATURE_LABELS.get(feature, feature.replace("_", " ")),
         "status": status,
-        "status_label": _STATUS.get(status, "Not established"),
+        "status_label": _STATUS.get(status, "Not established from supplied brochure"),
         "conditions": conditions[:6],
         "chunk_id": (src or {}).get("chunk_id") or fact.get("source_chunk_id"),
     }
@@ -155,18 +161,28 @@ def _company(values: dict[str, Any]) -> dict[str, Any] | None:
     facts = []
     for fact in profile.get("facts") or []:
         kind = str(fact.get("kind") or "UNKNOWN")
+        label = _FACT.get(kind, "UNKNOWN")
+        sources = fact.get("sources") or []
+        url = sources[0].get("url") if sources and isinstance(sources[0], dict) else ""
+        if str(url).startswith("advisor://"):
+            label_for_words = "ADVISOR"
+        else:
+            label_for_words = label
         facts.append({
             "text": fact.get("text") or "",
             "field": fact.get("field"),
-            "label": _FACT.get(kind, "UNKNOWN"),
+            "label": label,
+            "wording": _FACT_WORDING.get(label_for_words, _FACT_WORDING["UNKNOWN"]),
         })
     exposures = []
     for item in values.get("exposures") or []:
         status = str(item.get("status") or "UNKNOWN")
+        label = _FACT.get(status, "UNKNOWN")
         exposures.append({
             "title": item.get("title") or "",
             "description": item.get("description") or "",
-            "label": _FACT.get(status, "UNKNOWN"),
+            "label": label,
+            "wording": _FACT_WORDING.get(label, _FACT_WORDING["UNKNOWN"]),
             "rationale": item.get("reasoning") or "",
         })
     market = values.get("market_context") or {}
@@ -198,8 +214,15 @@ def _recommendation(values: dict[str, Any], docs: dict[str, Any]) -> dict[str, A
     fits = values.get("fits") or []
     fit = next((row for row in fits if row.get("policy_id") == pid), None)
     automatic = bool(pid) and state in {"eligible", "advisor_override"}
+    asked = any(req.get("client_asked") for req in (values.get("requirements") or []))
     history = values.get("recommendation_history") or []
     changed = any(event.get("evidence_change") for event in history)
+    if automatic and not asked:
+        wording = "No specific client priority was selected. The comparison therefore uses the standard baseline coverage criteria."
+    elif automatic:
+        wording = _RECOMMENDATION_WORDING
+    else:
+        wording = "No automatic recommendation. Missing evidence is not cover, and an unresolved must-have is not a pass or a fail."
     return {
         "automatic": automatic,
         "policy_id": pid if automatic else "",
@@ -209,7 +232,8 @@ def _recommendation(values: dict[str, Any], docs: dict[str, Any]) -> dict[str, A
         "confidence": None if fit is None else fit.get("confidence"),
         "decision_state": state,
         "decision_label": _DECISION.get(state, state.replace("_", " ").upper()),
-        "wording": _RECOMMENDATION_WORDING if automatic else "No automatic recommendation. Missing evidence is not cover, and an unresolved must-have is not a pass or a fail.",
+        "wording": wording,
+        "baseline_only": not asked,
         "drivers": list(rec.get("rationale") or [])[:4] if automatic else [],
         "gaps": [*list(rec.get("comparison_incomplete") or []), *list(rec.get("unresolved_must_haves") or []), *list(rec.get("caveats") or [])][:6],
         "changed_after_check": bool(changed),
@@ -289,22 +313,30 @@ def _comparison(values: dict[str, Any], docs: dict[str, Any]) -> dict[str, Any] 
     rows = []
     for feature in features[:14]:
         by_policy = cells.get(feature) or {}
+        row_cells = []
+        for pid in order:
+            raw = by_policy.get(pid) or {}
+            fact = raw.get("fact") or {}
+            sources = fact.get("sources") or []
+            src = next((item for item in sources if isinstance(item, dict)), {})
+            state = coverage_state(str(raw.get("status") or "NOT_FOUND"))
+            row_cells.append({
+                "policy_id": pid,
+                "policy_name": _name(docs, pid),
+                "state": state,
+                "status_label": coverage_label(state),
+                "page": src.get("page") or fact.get("source_page"),
+                "section": src.get("section") or fact.get("source_section"),
+            })
         rows.append({
             "feature": feature,
             "label": FEATURE_LABELS.get(feature, feature.replace("_", " ")),
-            "cells": [
-                {
-                    "policy_id": pid,
-                    "policy_name": _name(docs, pid),
-                    "state": coverage_state(str((by_policy.get(pid) or {}).get("status") or "NOT_FOUND")),
-                    "status_label": coverage_label(coverage_state(str((by_policy.get(pid) or {}).get("status") or "NOT_FOUND"))),
-                }
-                for pid in order
-            ],
+            "cells": row_cells,
         })
     return {
         "policies": [{"policy_id": pid, "policy_name": _name(docs, pid), "insurer": _insurer(docs, pid)} for pid in order],
         "rows": rows,
+        "baseline": not bool(asked),
     }
 
 

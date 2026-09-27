@@ -7,8 +7,8 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "sw
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Marsh Evidence-First Advisory",
-  description: "Client-specific, policy-grounded health insurance pitches with claim-level audit.",
+  title: "Marsh Health Policy Advisory",
+  description: "Evidence-led health insurance comparison and advisory system.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

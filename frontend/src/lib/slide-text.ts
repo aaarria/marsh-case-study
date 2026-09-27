@@ -9,14 +9,16 @@ export function splitBullet(text: string): { label: string; body: string } {
   }
   let label = "";
   let body = raw;
-  if (raw.includes("|")) {
-    const [a, b] = raw.split("|", 2);
-    label = a.trim();
-    body = (b ?? "").trim();
-  } else if (raw.includes(":") && raw.split(":")[0].length <= 36) {
-    const [a, b] = raw.split(":", 2);
-    label = a.trim();
-    body = (b ?? "").trim();
+  const pipe = raw.indexOf("|");
+  if (pipe >= 0) {
+    label = raw.slice(0, pipe).trim();
+    body = raw.slice(pipe + 1).trim();
+  } else {
+    const colon = raw.indexOf(":");
+    if (colon > 0 && colon <= 36) {
+      label = raw.slice(0, colon).trim();
+      body = raw.slice(colon + 1).trim();
+    }
   }
   if (!label || GENERIC.has(label.toUpperCase()) || body.toLowerCase() === label.toLowerCase()) return { label: body, body: "" };
   return { label, body };

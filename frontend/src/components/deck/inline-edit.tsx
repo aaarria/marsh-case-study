@@ -91,7 +91,7 @@ export function InlineEdit({ runId, slide, bulletIndex, onAccept, onClose }: { r
             <span>{proposal.bullet.source_chunk_ids.length ? `${proposal.bullet.source_chunk_ids.length} source(s) cited` : proposal.bullet.kind === "policy" ? "no source" : "no source needed"}</span>
             {bullet.source_chunk_ids.length > 0 && proposal.bullet.source_chunk_ids.length < bullet.source_chunk_ids.length && <span className="tone-warn tint-text">drops a citation</span>}
             {proposal.note && <span className="tone-warn tint-text">{proposal.note}</span>}
-            {proposal.audit && <span className={blocked ? "tone-danger tint-text" : ""}>Audit: {proposal.audit.status.replaceAll("_", " ").toLowerCase()}{proposal.audit.detail ? ` — ${proposal.audit.detail}` : ""}</span>}
+            {proposal.audit && <span className={blocked ? "tone-danger tint-text" : ""}>Audit: {proposal.audit.status.replaceAll("_", " ").toLowerCase()}{proposal.audit.detail ? `: ${proposal.audit.detail}` : ""}</span>}
             {unchanged && <span>No change proposed.</span>}
           </div>
           <div className="flex flex-wrap items-center gap-2">

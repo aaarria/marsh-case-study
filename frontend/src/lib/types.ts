@@ -278,6 +278,7 @@ export interface AdvisorFact {
   text: string;
   field?: string | null;
   label: "VERIFIED" | "ASSUMPTION" | "UNKNOWN" | string;
+  wording?: string;
 }
 
 export interface AdvisorView {
@@ -291,7 +292,7 @@ export interface AdvisorView {
     research_status?: string | null;
     research_note?: string | null;
     facts: AdvisorFact[];
-    exposures: { title: string; description: string; label: string; rationale: string }[];
+    exposures: { title: string; description: string; label: string; wording?: string; rationale: string }[];
     market?: { status: string; note: string; context: string; hypotheses: string[] };
   } | null;
   recommendation?: {
@@ -304,6 +305,7 @@ export interface AdvisorView {
     decision_state: string;
     decision_label: string;
     wording: string;
+    baseline_only?: boolean;
     drivers: string[];
     gaps: string[];
     changed_after_check: boolean;
@@ -314,7 +316,8 @@ export interface AdvisorView {
   why?: { requirement: string; feature?: string | null; priority: string; result: string; page?: number | null; policy_name?: string | null; impact: string; contribution?: number | null; weight?: number | null; chunk_id?: string | null }[];
   comparison?: {
     policies: { policy_id: string; policy_name?: string | null; insurer?: string | null }[];
-    rows: { feature: string; label: string; cells: { policy_id: string; policy_name?: string | null; state?: string; status_label: string }[] }[];
+    baseline?: boolean;
+    rows: { feature: string; label: string; cells: { policy_id: string; policy_name?: string | null; state?: string; status_label: string; page?: number | null; section?: string | null }[] }[];
   } | null;
   policy_check?: {
     status: string;

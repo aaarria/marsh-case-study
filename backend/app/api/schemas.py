@@ -20,7 +20,7 @@ class AnalyzeResponse(BaseModel):
 class SlideIn(BaseModel):
     title: str = Field(max_length=200)
     subtitle: str | None = Field(default=None, max_length=300)
-    bullets: list[dict[str, Any]] = Field(default_factory=list, max_length=12)
+    bullets: list[dict[str, Any]] = Field(default_factory=list, max_length=16)
     footnote: str | None = None
     layout: str = "bullets"
 

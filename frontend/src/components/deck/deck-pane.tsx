@@ -91,7 +91,7 @@ function SourceSheet({ src, onClose }: { src: SourceRef | null; onClose: () => v
   );
 }
 
-/** The deck, always visible: thumbnails, the open slide, and — while editing — that slide's fields. */
+/** The deck, always visible: thumbnails, the open slide, and, while editing, that slide's fields. */
 export function DeckPane({ state, deck }: { state: RunState; deck: Deck }) {
   const v = state.values;
   const pitch = v.pitch;
@@ -194,7 +194,11 @@ export function DeckPane({ state, deck }: { state: RunState; deck: Deck }) {
               return (
                 <li key={s.slide_number}>
                   <button type="button" onClick={() => deck.go(i)} aria-current={on ? "true" : undefined} className={cn("focus-ring w-full rounded-md p-1 text-left transition-colors duration-(--dur-fast)", on ? "bg-raised ring-1 ring-ink/70" : "hover:bg-raised/60")}>
-                    <SlideCanvas mode="thumb" slide={s} index={i} total={slides.length} disclaimer={pitch.disclaimer} refsByChunk={refsByChunk} className="shadow-none" />
+                    <div className="slide-stage">
+                      <div className="slide-stage-scale">
+                        <SlideCanvas mode="thumb" slide={s} index={i} total={slides.length} disclaimer={pitch.disclaimer} refsByChunk={refsByChunk} className="shadow-none" />
+                      </div>
+                    </div>
                     <div className="mt-1 flex items-center justify-between gap-1 px-0.5 text-2xs text-muted-foreground">
                       <span className={cn("truncate", on && "text-ink")}>{i + 1}</span>
                       <span className="flex shrink-0 items-center gap-1">
@@ -212,6 +216,8 @@ export function DeckPane({ state, deck }: { state: RunState; deck: Deck }) {
         <div className="thin-scroll flex min-w-0 flex-1 flex-col items-center overflow-y-auto px-6 py-5">
           <div className="w-full max-w-[960px] space-y-4">
             <div className="relative">
+              <div className="slide-stage">
+              <div className="slide-stage-scale">
               <SlideCanvas
                 slide={slide}
                 index={deck.idx}
@@ -236,6 +242,8 @@ export function DeckPane({ state, deck }: { state: RunState; deck: Deck }) {
                 }}
                 className="shadow-3"
               />
+              </div>
+              </div>
               {aiBullet != null && slide.bullets[aiBullet] && <InlineEdit runId={state.run.run_id} slide={slide} bulletIndex={aiBullet} onAccept={(nb) => acceptAi(aiBullet, nb)} onClose={() => setAiBullet(null)} />}
             </div>
             <div className="flex items-center gap-1.5 text-2xs text-quiet">

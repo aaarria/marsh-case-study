@@ -47,9 +47,11 @@ def test_advisor_view_does_not_invent_a_winner_or_a_quote():
     assert view["company"]["exposures"][0]["label"] == "UNKNOWN"
     assert view["comparison"]["policies"][0]["policy_id"] == "p2"
     labels = {cell["policy_id"]: cell["status_label"] for cell in view["comparison"]["rows"][0]["cells"]}
-    assert labels == {"p2": "Excluded", "p1": "Not established"}
+    assert labels == {"p2": "Excluded under the supplied brochure", "p1": "Not established from supplied brochure"}
+    assert view["comparison"]["baseline"] is False
+    assert view["recommendation"]["baseline_only"] is False
     missing = lookup_evidence(values, "p1", "maternity")
-    assert missing["quote"] is None and missing["status_label"] == "Not specified in supplied brochure"
+    assert missing["quote"] is None and missing["status_label"] == "Not established from supplied brochure"
     found = lookup_evidence(values, "p2", "maternity")
     assert found["quote"] == "Maternity is not covered."
     assert view["policy_check"]["stability"] == "INCOMPLETE"
@@ -84,14 +86,22 @@ def test_canvas_and_pptx_share_slide_wording(tmp_path):
 
     prs = Presentation(str(out))
     texts = [" ".join(run.text for shape in slide.shapes if shape.has_text_frame for paragraph in shape.text_frame.paragraphs for run in paragraph.runs) for slide in prs.slides]
+    assert pitch.slides[0].layout == "cover"
     assert texts and profile.company_name in texts[0]
-    assert len(texts) == len(pitch.slides) + 1
+    assert len(texts) == len(pitch.slides)
     assert len(texts) <= 5
-    for slide, rendered in zip(pitch.slides, texts[1:]):
+    for slide, rendered in zip(pitch.slides, texts):
         label, body = _parts(slide.bullets[0].text) if slide.bullets else ("", "")
         assert slide.title in rendered or profile.company_name in rendered
         if body:
             assert body[:40] in rendered or label in rendered
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if not shape.has_text_frame:
+                continue
+            for paragraph in shape.text_frame.paragraphs:
+                for run in paragraph.runs:
+                    assert not getattr(run.hyperlink, "address", None)
     ts = (ROOT / "frontend/src/lib/slide-text.ts").read_text()
     assert "assumption:" in ts and "why this policy:" in ts and "watch-out:" in ts
 
@@ -123,11 +133,9 @@ def test_pitch_fit_score_uses_the_calculated_score_not_a_model_number():
     pitch, warnings = generate_pitch(profile, exposures, rec, pack, llm=_Writer())
     blob = " ".join(b.text for s in pitch.slides for b in s.bullets)
     assert "87.1" not in blob
-    assert "67.1" in blob
-    score_bullets = [b for s in pitch.slides for b in s.bullets if "67.1" in b.text]
-    assert score_bullets
-    assert all(b.kind == "recommendation" and not b.source_chunk_ids for b in score_bullets)
-    assert any("calculated recommendation score" in line or "not brochure evidence" in line for line in warnings)
+    assert "67.1" not in blob
+    assert "/100" not in blob
+    assert any("not brochure evidence" in line or "not shown to the client" in line for line in warnings)
 
 
 def test_upload_stays_out_of_the_policy_corpus(retriever):

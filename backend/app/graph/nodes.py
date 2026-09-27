@@ -393,6 +393,7 @@ def pitch_node(state: AdvisoryState) -> dict:
         EvidencePack.model_validate(state["evidence_pack"]),
         version=version,
         feedback=state.get("regenerate_feedback"),
+        matrix=ComparisonMatrix.model_validate(state["matrix"]) if state.get("matrix") else None,
     )
     return {"pitch": _dump(pitch), "pitch_warnings": warnings, "regenerate_feedback": None, "pitch_stale": False}
 
