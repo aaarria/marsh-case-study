@@ -21,7 +21,7 @@ If web research is on, the backend fetches Wikipedia, the company site, then Bra
 - **INFERENCE** — derived from those facts
 - **ASSUMPTION** — not sourced
 
-If research finds nothing and you gave only a name, the thread asks you to add what you know or to continue. Continuing means later company lines stay labelled as assumptions. The screen can say “web research is off” in that question even when research ran and simply found no page.
+If research runs and still finds no reliable public source, and you gave only a name, the thread says research was attempted and asks you to add what you know or to continue. Continuing means later company lines stay labelled as assumptions. The thread says “web research is off” only when web research is actually disabled. One search provider failing does not stop the others, and a missing Wikipedia page is not treated as a skipped search.
 
 ## 3. Exposures
 

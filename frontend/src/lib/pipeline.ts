@@ -20,7 +20,7 @@ export const NODE_LABELS: Record<string, string> = {
 
 /** What a step is doing while it runs (the wait is a teaching moment). */
 export const NODE_EXPLAIN: Record<string, string> = {
-  research_company: "Looking up the client. Verified statements stay labelled. Anything without a source stays an assumption or unknown.",
+  research_company: "Searching public sources for this company. A missing page does not mean research was skipped.",
   market_intelligence: "Reading industry context. This does not change the policy score.",
   confirm_context: "Checking whether the deck would rest on assumptions alone.",
   map_exposures: "Turning what we know about the client into health-cover needs.",

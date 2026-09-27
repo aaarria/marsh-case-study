@@ -63,9 +63,22 @@ function StepMessage({ item, state, policyName, deck, refresh }: { item: Extract
         ? (["VERIFIED", "ASSUMPTION", "UNKNOWN"] as const).map((k) => [k, company.facts.filter((f) => f.label === k).length] as const).filter(([, n]) => n > 0)
         : (["FACT", "INFERENCE", "ASSUMPTION", "UNKNOWN"] as const).map((k) => [k, p.facts.filter((f) => f.kind === k).length] as const).filter(([, n]) => n > 0);
       const webFacts = p.facts.filter((f) => f.kind === "FACT" && f.sources.some((x) => /^https?:/.test(x.url))).length;
-      const sourced = webFacts > 0 ? ` · ${webFacts} web-sourced fact${webFacts === 1 ? "" : "s"}` : p.research_status === "OK" ? "" : " · no web sources";
+      const count = webFacts > 0 ? ` · ${webFacts} web-sourced fact${webFacts === 1 ? "" : "s"}` : "";
+      const summary =
+        p.research_status === "RESEARCH_COMPLETE" || p.research_status === "OK"
+          ? `Company research complete${count}`
+          : p.research_status === "RESEARCH_PARTIAL"
+            ? "Research partially completed"
+            : p.research_status === "NO_VERIFIED_SOURCE"
+              ? "Research attempted — no verified public source found"
+              : p.research_status === "RESEARCH_DISABLED"
+                ? "Web research is off"
+                : p.research_status === "RESEARCH_FAILED"
+                  ? "Company research could not be completed"
+                  : `Researched ${p.company_name}${count}`;
+      const note = p.research_note && !/HTTP\s*\d{3}/i.test(p.research_note) ? p.research_note : null;
       return (
-        <ToolRow icon={Globe} summary={`Researched ${p.company_name}${sourced}`} meta={meta}>
+        <ToolRow icon={Globe} summary={summary} meta={meta}>
           {p.overview && <p><Stream text={p.overview} /></p>}
           <div className="flex flex-wrap items-center gap-1.5">
             {counts.map(([k, n]) => (
@@ -75,7 +88,7 @@ function StepMessage({ item, state, policyName, deck, refresh }: { item: Extract
             ))}
           </div>
           <ChipRow items={[p.industry, p.size, p.geography, p.workforce].filter((x): x is string => !!x && x.toLowerCase() !== "unknown")} />
-          {p.research_note && <p className="text-xs text-muted-foreground"><Stream text={p.research_note} /></p>}
+          {note && <p className="text-xs text-muted-foreground"><Stream text={note} /></p>}
           {company?.market && company.market.status !== "OK" && <p className="text-xs text-muted-foreground">Industry context is unknown. It is not used as a policy score.</p>}
         </ToolRow>
       );

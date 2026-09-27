@@ -17,40 +17,86 @@ def _no_llm() -> LLMService:
 def test_offline_research_uses_only_advisor_inputs():
     intake = ClientIntake(company_name="Acme Steel", industry="Steel manufacturing", employee_count=12000)
     p = research_company(intake, llm=_no_llm(), search=WebSearch(enabled=False))
-    assert p.research_status == "UNAVAILABLE"
+    assert p.research_status == "RESEARCH_DISABLED"
+    assert "WEB_RESEARCH_ENABLED" in (p.research_note or "")
     kinds = {f.kind for f in p.facts}
     assert FactKind.UNKNOWN in kinds
     adv = [f for f in p.facts if f.sources and f.sources[0].url.startswith("advisor://")]
     assert len(adv) == 2 and all(f.kind == FactKind.FACT for f in adv)
 
 
-def test_fact_without_source_is_downgraded_to_assumption():
+def test_fact_without_source_is_not_kept_as_company_fact():
+    """A FACT the model cannot cite is dropped. It is not relabelled into an industry we will show."""
+    from app.models.client import WebSource
+
     def handler(system, user, schema):
         return ProfileOut(overview="o", industry="Software", size=None, geography="India", workforce=None,
                           facts=[FactOut(field="industry", text="Acme is a software company", kind="FACT", source_ids=[], confidence=0.9),
                                  FactOut(field="size", text="Unknown", kind="UNKNOWN", source_ids=[], confidence=0.1)])
-    llm = LLMService(mock_handler=handler)
-    p = research_company(ClientIntake(company_name="Acme"), llm=llm, search=WebSearch(enabled=False))
-    f = next(x for x in p.facts if x.field == "industry")
-    assert f.kind == FactKind.ASSUMPTION
-    assert p.research_status == "PARTIAL"
+
+    class _Search:
+        available = True
+        calls = 0
+
+        def cached(self, company):
+            return None
+
+        def reference_sources(self, company):
+            return []
+
+        def search(self, query, max_results=5, about=None):
+            self.calls += 1
+            return [WebSource(url="https://acme.example/about", title="Acme", snippet="Acme publishes an about page.", accessible=True)]
+
+        def read(self, sources, company):
+            return sources
+
+        def remember(self, company, sources):
+            return None
+
+    p = research_company(ClientIntake(company_name="Acme"), llm=LLMService(mock_handler=handler), search=_Search())
+    assert p.research_status == "RESEARCH_PARTIAL"
+    assert not any("software company" in f.text for f in p.facts)
+    assert any(f.field == "industry" and f.kind == FactKind.UNKNOWN for f in p.facts)
 
 
 def test_advisor_answered_fields_are_not_duplicated_by_model():
+    from app.models.client import WebSource
+
     def handler(system, user, schema):
         return ProfileOut(overview="o", industry="Software", size=None, geography=None, workforce=None,
                           facts=[FactOut(field="industry", text="Software", kind="ASSUMPTION", source_ids=[], confidence=0.5),
                                  FactOut(field="size", text="Unknown", kind="UNKNOWN", source_ids=[], confidence=0.1),
                                  FactOut(field="workforce", text="500 employees", kind="ASSUMPTION", source_ids=[], confidence=0.4),
                                  FactOut(field="business", text="Unknown", kind="UNKNOWN", source_ids=[], confidence=0.1)])
+
+    class _Search:
+        available = True
+
+        def cached(self, company):
+            return None
+
+        def reference_sources(self, company):
+            return []
+
+        def search(self, query, max_results=5, about=None):
+            return [WebSource(url="https://acme.example/about", title="Acme", snippet="Acme describes its business on this page.", accessible=True)]
+
+        def read(self, sources, company):
+            return sources
+
+        def remember(self, company, sources):
+            return None
+
     intake = ClientIntake(company_name="Acme", industry="Software", employee_count=500)
-    p = research_company(intake, llm=LLMService(mock_handler=handler), search=WebSearch(enabled=False))
+    p = research_company(intake, llm=LLMService(mock_handler=handler), search=_Search())
     by_field = {}
     for f in p.facts:
         by_field.setdefault(f.field, []).append(f)
     assert [f.kind for f in by_field["industry"]] == [FactKind.FACT]
     assert [f.kind for f in by_field["size"]] == [FactKind.FACT]
-    assert "workforce" not in by_field  # echo of the advisor's headcount under another field
+    assert not any("500" in f.text for f in by_field.get("workforce", []))
+    assert [f.kind for f in by_field["workforce"]] == [FactKind.UNKNOWN]
     assert [f.kind for f in by_field["business"]] == [FactKind.UNKNOWN]
 
 
@@ -219,6 +265,7 @@ def test_research_uses_reference_sources_when_engines_are_rate_limited():
 
     class _Search:
         available = True
+        calls = 0
 
         def cached(self, company):
             return None
@@ -229,6 +276,7 @@ def test_research_uses_reference_sources_when_engines_are_rate_limited():
         def search(self, query, max_results=5, about=None):
             from app.research.search import SearchUnavailable
 
+            self.calls += 1
             raise SearchUnavailable("no search engine answered (brave: HTTP 429; duckduckgo: HTTP 202; bing: nothing about Acme Ltd)")
 
         def read(self, sources, company):
@@ -244,7 +292,10 @@ def test_research_uses_reference_sources_when_engines_are_rate_limited():
 
     search = _Search()
     p = research_company(ClientIntake(company_name="Acme Ltd"), llm=LLMService(mock_handler=handler), search=search)
-    assert p.research_status == "PARTIAL" and "Search engines did not answer" in p.research_note and "HTTP 429" in p.research_note
+    assert p.research_status == "RESEARCH_COMPLETE"
+    assert "rate-limited" in (p.research_note or "")
+    assert "web research is off" not in (p.research_note or "").lower()
+    assert search.calls >= 2  # the first provider failure does not abort the remaining queries
     size = [f for f in p.facts if f.field == "size"][0]
     assert size.kind == FactKind.FACT and size.sources[0].url == "https://en.wikipedia.org/wiki/Acme_Ltd"
     assert search.remembered and search.remembered[0].url.endswith("Acme_Ltd")

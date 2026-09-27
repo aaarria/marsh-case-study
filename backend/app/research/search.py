@@ -29,7 +29,9 @@ import base64
 import html as html_lib
 import json
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
@@ -51,6 +53,8 @@ MAX_PAGE_BYTES = 1_500_000
 MAX_READ_PAGES = 8
 SNIPPET_CHARS = 1200
 CACHE_TTL = timedelta(hours=24)
+# One retry after HTTP 429. Tests set this to 0. Not a retry loop.
+RETRY_BACKOFF_SECONDS = 0.5
 WIKI = "https://en.wikipedia.org"
 # Infobox rows worth carrying into the profile, in display order.
 INFOBOX_ROWS = ("Type", "Traded as", "Industry", "Founded", "Headquarters", "Area served", "Number of locations", "Key people", "Products", "Services", "Revenue", "Number of employees", "Parent", "Owner", "Subsidiaries", "Divisions", "Website")
@@ -61,6 +65,19 @@ RELEVANCE_TERMS = ("employee", "workforce", "staff", "headcount", "headquarter",
 
 class SearchUnavailable(RuntimeError):
     pass
+
+
+@dataclass
+class SearchReport:
+    """Sources from every provider that answered, plus isolated provider failures."""
+
+    sources: list[WebSource]
+    failures: list[str]
+
+
+def _cacheable(sources: list[WebSource]) -> bool:
+    """A hit needs real text. Inaccessible pages with an empty snippet are not a result."""
+    return any((s.snippet or "").strip() for s in sources)
 
 
 # ---------------------------------------------------------------------------
@@ -251,11 +268,24 @@ def name_tokens(company: str) -> list[str]:
 
 
 def mentions(text: str, company: str) -> bool:
-    """Does `text` name the company? All distinctive tokens for short names, most of them for long ones."""
+    """Does `text` name the company? Tokens must match as words, so "apple" does not match "pineapple"."""
     low = text.lower()
+    phrase = company.strip().lower()
+    if phrase and re.search(rf"(?<![a-z0-9]){re.escape(phrase)}(?![a-z0-9])", low):
+        return True
     tokens = name_tokens(company)
     need = len(tokens) if len(tokens) <= 2 else len(tokens) - 1
-    return company.strip().lower() in low or sum(1 for t in tokens if t in low) >= need
+
+    def has(token: str) -> bool:
+        return re.search(rf"(?<![a-z0-9]){re.escape(token)}(?![a-z0-9])", low) is not None
+
+    if sum(1 for t in tokens if has(t)) >= need:
+        return True
+    # asianpaints.com is the same name as "Asian Paints". A single token must not match inside a longer word.
+    if len(tokens) >= 2:
+        compact = re.sub(r"[^a-z0-9]+", "", low)
+        return "".join(tokens) in compact
+    return False
 
 
 def relevant_passage(text: str, company: str, limit: int = SNIPPET_CHARS) -> str:
@@ -355,36 +385,79 @@ class WebSearch:
 
     # -- search engines -----------------------------------------------------
 
-    def search(self, query: str, max_results: int = 5, about: str | None = None) -> list[WebSource]:
-        """Organic results for `query` from the first engine that answers with usable results.
+    def _engine_items(self, client: httpx.Client, template: str, parse, query: str) -> tuple[str | None, list[tuple[str, str, str]]]:
+        """(failure reason, parsed items). A reason of None means the page was fetched."""
+        r = self._get(client, template.format(q=quote_plus(query)))
+        if isinstance(r, str):
+            return r, []
+        return None, parse(r.text)
 
-        With `about=<company>`, results whose title, snippet and URL never name the company are
-        dropped (an engine that answered a different question is treated as not having answered).
+    def search_providers(self, query: str, max_results: int = 5, about: str | None = None, skip: set[str] | None = None) -> SearchReport:
+        """Query every engine. One provider's 429, challenge page, or empty parse does not stop the others.
+
+        `skip` is updated with providers that stay rate-limited or challenged after a single retry,
+        so later queries in the same company search do not hammer them. It is owned by the caller
+        and is not kept on the process-wide client.
         """
         if not self._enabled:
             raise SearchUnavailable("Web research is disabled (WEB_RESEARCH_ENABLED=false)")
+        skipped = skip if skip is not None else set()
         now = datetime.now(timezone.utc).isoformat()
-        failures = []
+        failures: list[str] = []
+        found: list[WebSource] = []
+        seen: set[str] = set()
         with self._client() as client:
             for name, template, parse in ENGINES:
-                r = self._get(client, template.format(q=quote_plus(query)))
-                items = parse(r.text) if not isinstance(r, str) else []
-                out: list[WebSource] = []
-                seen: set[str] = set()
+                if name in skipped:
+                    failures.append(f"{name}: skipped after an earlier limit")
+                    continue
+                reason, items = self._engine_items(client, template, parse, query)
+                if reason == "HTTP 429":
+                    time.sleep(RETRY_BACKOFF_SECONDS)
+                    reason, items = self._engine_items(client, template, parse, query)
+                    if reason == "HTTP 429":
+                        skipped.add(name)
+                        failures.append(f"{name}: HTTP 429")
+                        log.info("web_search[%s] rate-limited; continuing with other providers", name)
+                        continue
+                if reason == "HTTP 202":
+                    skipped.add(name)
+                    failures.append(f"{name}: HTTP 202")
+                    log.info("web_search[%s] challenge page; continuing with other providers", name)
+                    continue
+                if reason:
+                    failures.append(f"{name}: {reason}")
+                    continue
+                added = 0
                 for title, url, snippet in items:
                     host = urlparse(url).netloc
                     if not url.startswith(("http://", "https://")) or any(host.endswith(h) for h in ENGINE_HOSTS) or url in seen:
                         continue
                     if about and not mentions(f"{title} {snippet} {unquote(url)}", about):
                         continue
+                    if added >= 3:
+                        break
                     seen.add(url)
-                    out.append(WebSource(url=url, title=title or None, snippet=snippet[:600] or None, retrieved_at=now))
-                if not out:
-                    failures.append(f"{name}: {r if isinstance(r, str) else 'nothing about ' + about if items and about else 'no results on the page (bot challenge?)'}")
+                    found.append(WebSource(url=url, title=title or None, snippet=snippet[:600] or None, retrieved_at=now))
+                    added += 1
+                if added == 0:
+                    why = f"nothing about {about}" if items and about else "no results on the page (bot challenge?)"
+                    failures.append(f"{name}: {why}")
                     continue
-                log.info("web_search[%s] %r -> %s results", name, query[:60], len(out))
-                return out[:max_results]
-        raise SearchUnavailable("no search engine answered (" + "; ".join(failures) + ")")
+                log.info("web_search[%s] %r -> %s results", name, query[:60], added)
+        return SearchReport(sources=found[:max_results], failures=failures)
+
+    def search(self, query: str, max_results: int = 5, about: str | None = None, skip: set[str] | None = None) -> list[WebSource]:
+        """Organic results for `query`. Raises only when every provider failed to return a usable result.
+
+        With `about=<company>`, results whose title, snippet and URL never name the company are
+        dropped (an engine that answered a different question is treated as not having answered).
+        """
+        report = self.search_providers(query, max_results=max_results, about=about, skip=skip)
+        if not report.sources:
+            detail = "; ".join(report.failures) or "no results"
+            raise SearchUnavailable(f"no search engine answered ({detail})")
+        return report.sources
 
     # -- reference sources: Wikipedia and the company's own site ----------------
 
@@ -445,15 +518,54 @@ class WebSearch:
                     log.info("official site %s -> %s readable pages", urlparse(home).netloc, len(out) - 1)
         return out
 
+    def discover_named_site(self, company: str) -> list[WebSource]:
+        """Try the company-name domain when Wikipedia and the engines have little to show.
+
+        At most two fetches (.com, then .in). The page is kept only when its text names this
+        company. A one-word name is not guessed, so "Apple" does not become apple.com.
+        """
+        tokens = name_tokens(company)
+        if len(tokens) < 2:
+            return []
+        slug = "".join(tokens)
+        if not 8 <= len(slug) <= 48:
+            return []
+        now = datetime.now(timezone.utc).isoformat()
+        with self._client() as client:
+            for url in (f"https://{slug}.com/", f"https://{slug}.in/"):
+                if not self._allowed(client, url):
+                    continue
+                fetched = self._get(client, url)
+                if isinstance(fetched, str):
+                    log.info("domain discovery %s -> %s", slug, fetched)
+                    continue
+                title, text = html_to_text(fetched.text)
+                blob = f"{title}\n{text[:8000]}"
+                if not mentions(blob, company):
+                    continue
+                passage = relevant_passage(text, company) or re.sub(r"\s+", " ", blob).strip()[:SNIPPET_CHARS]
+                if not passage:
+                    continue
+                log.info("domain discovery %s -> %s", company, fetched.url)
+                return [WebSource(url=str(fetched.url), title=(title or company)[:200], published_date=published_date(fetched.text), snippet=passage[:SNIPPET_CHARS], accessible=True, retrieved_at=now)]
+        return []
+
     # -- cache --------------------------------------------------------------
+
+    def _cache_slug(self, company: str) -> str:
+        return (re.sub(r"[^a-z0-9]+", "-", company.lower()).strip("-") or "company")[:80]
 
     def _cache_file(self, company: str) -> Path | None:
         if not self._cache_dir:
             return None
-        return self._cache_dir / ((re.sub(r"[^a-z0-9]+", "-", company.lower()).strip("-") or "company")[:80] + ".json")
+        return self._cache_dir / (self._cache_slug(company) + ".json")
 
     def cached(self, company: str) -> list[WebSource] | None:
-        """Sources remembered for `company` within CACHE_TTL, else None."""
+        """Usable sources for this normalized name within CACHE_TTL.
+
+        Empty results and pages with no snippet are a miss, so a transient failure is not reused
+        as "this company has no web presence."
+        """
         f = self._cache_file(company)
         if not f or not f.exists():
             return None
@@ -464,15 +576,26 @@ class WebSearch:
             return None
         if datetime.now(timezone.utc) - at > CACHE_TTL:
             return None
-        return [WebSource.model_validate(s) for s in d.get("sources", [])]
+        stored = d.get("normalized")
+        if stored and stored != self._cache_slug(company):
+            return None
+        sources = [WebSource.model_validate(s) for s in d.get("sources", [])]
+        if not _cacheable(sources):
+            return None
+        return sources
 
     def remember(self, company: str, sources: list[WebSource]) -> None:
         f = self._cache_file(company)
-        if not f or not sources:
+        if not f or not _cacheable(sources):
             return
         try:
             f.parent.mkdir(parents=True, exist_ok=True)
-            f.write_text(json.dumps({"company": company, "fetched_at": datetime.now(timezone.utc).isoformat(), "sources": [s.model_dump() for s in sources]}, indent=1))
+            f.write_text(json.dumps({
+                "company": company,
+                "normalized": self._cache_slug(company),
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
+                "sources": [s.model_dump() for s in sources],
+            }, indent=1))
         except OSError as exc:
             log.warning("research cache not written: %s", exc)
 
@@ -519,4 +642,4 @@ def get_search() -> WebSearch:
     return _search
 
 
-__all__ = ["SearchUnavailable", "WebSearch", "get_search", "html_to_text", "parse_bing", "parse_brave", "parse_ddg", "parse_infobox", "relevant_passage"]
+__all__ = ["SearchReport", "SearchUnavailable", "WebSearch", "get_search", "html_to_text", "parse_bing", "parse_brave", "parse_ddg", "parse_infobox", "relevant_passage"]

@@ -168,23 +168,38 @@ def market_node(state: AdvisoryState) -> dict:
 CONTEXT_FIELDS = ("industry", "geography", "employee_count", "advisor_notes", "client_priorities")
 
 
+def context_prompt(intake: ClientIntake, profile: CompanyProfile) -> dict | None:
+    """Ask only after research is disabled, failed, or exhausted. A partial find is not a reason to stop."""
+    web_facts = any(f.kind == FactKind.FACT and f.sources and not f.sources[0].url.startswith("advisor://") for f in profile.facts)
+    if _has_context(intake) or web_facts or profile.research_status not in {"NO_VERIFIED_SOURCE", "RESEARCH_DISABLED", "RESEARCH_FAILED"}:
+        return None
+    name = intake.company_name
+    if profile.research_status == "RESEARCH_DISABLED":
+        message = f"I have nothing verified about {name}: web research is off and only the name was given. Every company statement in the deck would be a labelled assumption. Add what you know, or continue with assumptions?"
+    elif profile.research_status == "RESEARCH_FAILED":
+        message = f"Company research could not be completed for {name}. Add what you know, or continue with unknowns labelled as such?"
+    else:
+        message = f"Web research was attempted, but no sufficiently reliable public source was found for {name}. What is still unknown stays unknown. Add what you know, or continue with assumptions?"
+    return {
+        "question": "context",
+        "message": message,
+        "options": [{"id": "add_context", "label": "Add what I know"}, {"id": "continue", "label": "Continue with assumptions"}],
+        "fields": list(CONTEXT_FIELDS),
+    }
+
+
 @node("confirm_context")
 def context_node(state: AdvisoryState) -> dict:
-    """Ask for context only when the deck would otherwise rest on assumptions alone."""
+    """Ask for context only when research was skipped, failed, or genuinely found nothing."""
     intake = ClientIntake.model_validate(state["intake"])
     profile = CompanyProfile.model_validate(state["profile"])
-    web_facts = any(f.kind == FactKind.FACT and f.sources and not f.sources[0].url.startswith("advisor://") for f in profile.facts)
-    if _has_context(intake) or web_facts:
+    prompt = context_prompt(intake, profile)
+    if prompt is None:
         return {"research_again": False}
     answer = ask(
         state,
         "confirm_context",
-        {
-            "question": "context",
-            "message": f"I have nothing verified about {intake.company_name}: web research is off and only the name was given. Every company statement in the deck would be a labelled assumption. Add what you know, or continue with assumptions?",
-            "options": [{"id": "add_context", "label": "Add what I know"}, {"id": "continue", "label": "Continue with assumptions"}],
-            "fields": list(CONTEXT_FIELDS),
-        },
+        prompt,
     )
     if answer["action"] == "add_context":
         merged = intake.model_copy(update={k: answer[k] for k in CONTEXT_FIELDS if answer.get(k) not in (None, "", [])})

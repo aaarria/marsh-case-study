@@ -41,7 +41,7 @@ function useAnswer(runId: string, onDone: () => Promise<void> | void) {
   return { busy, error, send };
 }
 
-/** "Only a name, and web research is off": add context or continue with labelled assumptions. */
+/** Name only, and research was off or found no reliable source: add context or continue with labelled assumptions. */
 export function ContextQuestion({ runId, q, onDone }: { runId: string; q: Question; onDone: () => Promise<void> }) {
   const { busy, error, send } = useAnswer(runId, onDone);
   const [f, setF] = useState({ industry: "", geography: "", employee_count: "", advisor_notes: "" });

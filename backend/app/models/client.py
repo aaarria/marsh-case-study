@@ -52,7 +52,7 @@ class CompanyProfile(BaseModel):
     business_characteristics: list[str] = Field(default_factory=list)
     key_risks: list[str] = Field(default_factory=list)
     facts: list[ClientFact] = Field(default_factory=list)
-    research_status: str = "OK"  # OK | PARTIAL | UNAVAILABLE
+    research_status: str = "OK"  # RESEARCH_COMPLETE | RESEARCH_PARTIAL | NO_VERIFIED_SOURCE | RESEARCH_DISABLED | RESEARCH_FAILED
     research_note: str | None = None
 
 

@@ -67,7 +67,7 @@ The thread is the run narrated as an agent transcript. Each step is a collapsibl
 
 | Question | When | Choices |
 |---|---|---|
-| Context check | Only a company name was given and web research is off, so the profile would be assumptions | Add industry / geography / headcount / notes / priorities and re-profile, or continue with assumptions (labelled as such) |
+| Context check | Only a company name was given, and web research is disabled or no reliable public source was found | Add industry / geography / headcount / notes / priorities and re-profile, or continue with assumptions (labelled as such) |
 | Recommendation check | Two policies land within five fit points | Pitch either one (score, confidence and rationale shown side by side) or let the score decide |
 | Your review | Every audited draft | Approve & export, edit slides, regenerate with feedback, reject. A FAIL gate lists each unsupported claim inline with **Evidence Passport / Edit / Remove bullet** actions; approving over a FAIL needs an explicit override with the reviewer's name |
 
