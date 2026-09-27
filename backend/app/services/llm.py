@@ -130,6 +130,36 @@ def _is_transient(exc: BaseException) -> bool:
     return type(exc).__name__ in {"ServerError", "ConnectError", "ReadTimeout", "ConnectTimeout", "RemoteProtocolError", "TimeoutException"}
 
 
+def _json_text(raw: str) -> str:
+    text = (raw or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
+def _groq_schema(schema: type[BaseModel]) -> dict:
+    """Pydantic JSON schema with $refs inlined. Groq rejects schemas that still contain $defs."""
+    raw = schema.model_json_schema()
+    defs = raw.get("$defs") or {}
+
+    def resolve(node: Any) -> Any:
+        if isinstance(node, list):
+            return [resolve(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+        if "$ref" in node:
+            name = str(node["$ref"]).rsplit("/", 1)[-1]
+            return resolve(defs.get(name, {}))
+        out = {key: resolve(value) for key, value in node.items() if key not in {"title", "$defs"}}
+        if out.get("type") == "object":
+            out["additionalProperties"] = False
+        return out
+
+    resolved = resolve(raw)
+    return resolved if isinstance(resolved, dict) else {"type": "object", "additionalProperties": False}
+
+
 def _thinking_config(model: str, level: str):
     """Thinking level applies to Gemini 3.x models only; other families use their defaults."""
     lvl = (level or "").strip().lower()
@@ -151,10 +181,17 @@ class LLMService:
     def __init__(self, model: str | None = None, mock_handler: Callable[[str, str, type[BaseModel]], BaseModel] | None = None):
         settings = get_settings()
         self.settings = settings
-        self.model = (model or settings.gemini_model).strip()
         self._mock = mock_handler
         self._client = None
-        if not mock_handler and settings.gemini_api_key:
+        self._groq_key = None
+        if mock_handler:
+            self.model = (model or settings.gemini_model).strip()
+        elif settings.uses_groq:
+            self._groq_key = (settings.groq_api_key or "").strip()
+            self.model = (model or settings.groq_model).strip()
+        else:
+            self.model = (model or settings.gemini_model).strip()
+        if not mock_handler and not self._groq_key and settings.gemini_api_key:
             from google import genai
             from google.genai import types
 
@@ -168,7 +205,7 @@ class LLMService:
 
     @property
     def available(self) -> bool:
-        return self._mock is not None or self._client is not None
+        return self._mock is not None or self._groq_key is not None or self._client is not None
 
     @property
     def audit_model(self) -> str:
@@ -179,6 +216,8 @@ class LLMService:
     def structured(self, system: str, user: str, schema: type[T], *, purpose: str = "general", model: str | None = None, temperature: float = 0.0) -> T:
         if self._mock is not None:
             return self._mock(system, user, schema)  # type: ignore[return-value]
+        if self._groq_key:
+            return self._call_groq(system, user, schema, purpose, (model or self.model).strip(), temperature)
         if self._client is None:
             raise LLMUnavailable("GEMINI_API_KEY is not configured")
         return self._call(system, user, schema, purpose, (model or self.model).strip(), temperature)
@@ -189,9 +228,89 @@ class LLMService:
                 text: str
 
             return self._mock(system, user, _S).text  # type: ignore[attr-defined]
+        if self._groq_key:
+            return self._call_groq(system, user, None, purpose, (model or self.model).strip(), temperature, max_tokens=max_tokens)
         if self._client is None:
             raise LLMUnavailable("GEMINI_API_KEY is not configured")
         return self._call(system, user, None, purpose, (model or self.model).strip(), temperature, max_tokens=max_tokens)
+
+    def _call_groq(self, system: str, user: str, schema: type[T] | None, purpose: str, model: str, temperature: float, max_tokens: int | None = None):
+        """OpenAI-compatible Groq chat completion. Scoring never goes through this path."""
+        import httpx
+
+        formats: list[dict | None] = [None]
+        if schema is not None:
+            formats = [
+                {"type": "json_schema", "json_schema": {"name": schema.__name__, "strict": False, "schema": _groq_schema(schema)}},
+                {"type": "json_object"},
+            ]
+        last = "Groq returned no usable output"
+        for fmt in formats:
+            messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+            if schema is not None and fmt and fmt.get("type") == "json_object":
+                messages[0] = {"role": "system", "content": system + "\n\nReply with one JSON object only. Schema:\n" + str(schema.model_json_schema())}
+            body: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                "temperature": max(0.0, min(1.0, temperature)),
+            }
+            if max_tokens:
+                body["max_tokens"] = max_tokens
+            if fmt is not None:
+                body["response_format"] = fmt
+            attempt = 0
+            while True:
+                attempt += 1
+                t0 = time.time()
+                try:
+                    resp = httpx.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {self._groq_key}", "Content-Type": "application/json"},
+                        json=body,
+                        timeout=120.0,
+                    )
+                except httpx.HTTPError as exc:
+                    if attempt < 3:
+                        time.sleep(1.5 * attempt)
+                        continue
+                    raise LLMError(f"Groq call failed ({type(exc).__name__}) for {purpose}") from exc
+                if resp.status_code == 429:
+                    wait = _parse_duration(resp.headers.get("retry-after")) or 20.0
+                    if attempt < 4 and wait <= 70:
+                        log.warning("Groq rate limit for %s; waiting %.0fs", purpose, wait)
+                        time.sleep(wait)
+                        continue
+                    raise LLMQuotaExceeded(
+                        f"Groq rate limit reached for {model}. Wait about {int(round(wait))}s and retry.",
+                        retry_after=wait,
+                        scope="minute",
+                        model=model,
+                    )
+                if resp.status_code in (401, 403):
+                    raise LLMError("Groq rejected the API key. Check GROQ_API_KEY on the server.")
+                if resp.status_code == 404:
+                    raise LLMError(f"Groq model '{model}' was not found. Set GROQ_MODEL to a current model from the Groq console.")
+                if resp.status_code == 400 and fmt and fmt.get("type") == "json_schema":
+                    last = resp.text[:300]
+                    break
+                if resp.status_code >= 500 and attempt < 3:
+                    time.sleep(1.5 * attempt)
+                    continue
+                if resp.status_code >= 400:
+                    raise LLMError(f"Groq call failed ({resp.status_code}) for {purpose}: {resp.text[:300]}")
+                data = resp.json()
+                raw = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+                log.info("LLM %s [%s] %.1fs", purpose, model, time.time() - t0)
+                if schema is None:
+                    return raw
+                try:
+                    return schema.model_validate_json(_json_text(raw))
+                except Exception as exc:
+                    last = str(exc)
+                    if fmt and fmt.get("type") == "json_schema":
+                        break
+                    raise LLMError(f"Groq returned JSON that does not match {schema.__name__} for {purpose}: {exc}") from exc
+        raise LLMError(f"Groq returned no structured output for {purpose}: {last}")
 
     # ---- transport ----
     def _config(self, system: str, schema: type[BaseModel] | None, model: str, temperature: float, max_tokens: int | None):

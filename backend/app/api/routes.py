@@ -77,9 +77,9 @@ def health():
     return {
         "status": "ok",
         "llm_configured": llm.available,
-        "llm_provider": "gemini",
+        "llm_provider": "groq" if settings.uses_groq else "gemini",
         "llm_model": llm.model,
-        "model_free_tier_known": settings.model_free_tier_known,
+        "model_free_tier_known": True if settings.uses_groq else settings.model_free_tier_known,
         "research_configured": settings.research_available,
         "embedding_provider": settings.embedding_provider,
         "retrieval": rs,

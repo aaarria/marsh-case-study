@@ -30,6 +30,8 @@ _SECRET_KEYS = (
     "GEMINI_EMBEDDING_MODEL",
     "RERANKER_ENABLED",
     "RERANKER_MODEL",
+    "GROQ_API_KEY",
+    "GROQ_MODEL",
 )
 _server_lock = threading.Lock()
 _server_started = False

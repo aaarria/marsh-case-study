@@ -20,9 +20,9 @@ async def lifespan(app: FastAPI):
     configure_logging(settings.log_level)
     log.info(
         "Marsh advisory API starting (llm=%s, model=%s%s, research=%s, embeddings=%s)",
-        "gemini" if settings.llm_available else "off",
-        settings.gemini_model,
-        "" if settings.model_free_tier_known else " [not on known free-tier list]",
+        "groq" if settings.uses_groq else ("gemini" if settings.llm_available else "off"),
+        settings.groq_model if settings.uses_groq else settings.gemini_model,
+        "" if settings.uses_groq or settings.model_free_tier_known else " [not on known free-tier list]",
         "crawler" if settings.research_available else "off",
         settings.embedding_provider,
     )

@@ -47,9 +47,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # LLM: Google Gemini API is the ONLY external AI provider. One key, one configurable model.
+    # LLM. Gemini remains the default. When GROQ_API_KEY is set, Groq is used instead.
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
     gemini_model: str = Field(default=DEFAULT_GEMINI_MODEL, alias="GEMINI_MODEL")
+    groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
+    groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
     # Gemini 3.x models think by default; "low" keeps latency and free-tier token use down.
     # Allowed: minimal | low | medium | high | default (leave the model default).
     gemini_thinking_level: str = Field(default="low", alias="GEMINI_THINKING_LEVEL")
@@ -131,7 +133,11 @@ class Settings(BaseSettings):
 
     @property
     def llm_available(self) -> bool:
-        return bool(self.gemini_api_key)
+        return bool((self.groq_api_key or "").strip() or self.gemini_api_key)
+
+    @property
+    def uses_groq(self) -> bool:
+        return bool((self.groq_api_key or "").strip())
 
     @property
     def research_available(self) -> bool:
