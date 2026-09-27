@@ -52,6 +52,11 @@ def test_matrix_cells_keep_provenance():
     assert cell_display(m.cells["air_ambulance"]["B"].fact).startswith("Add-on")
 
 
+def test_review_required_fact_still_builds_a_matrix_cell():
+    fact = _fact("A", "maternity", CoverageStatus.REVIEW_REQUIRED, value="Conflicting quotes")
+    assert cell_display(fact) == "Review required"
+
+
 def test_not_found_is_not_excluded_in_scoring():
     res = _results()
     scenarios = build_scenarios(_exposures())

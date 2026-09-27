@@ -15,12 +15,13 @@ STATUS_LABEL = {
     CoverageStatus.ADD_ON: "Add-on",
     CoverageStatus.NOT_FOUND: "Not specified in supplied brochure",
     CoverageStatus.UNKNOWN: "Unknown",
+    CoverageStatus.REVIEW_REQUIRED: "Review required",
 }
 
 
 def cell_display(fact: FeatureFact) -> str:
     status = STATUS_LABEL[fact.coverage_status]
-    if fact.coverage_status in {CoverageStatus.NOT_FOUND, CoverageStatus.UNKNOWN}:
+    if fact.coverage_status in {CoverageStatus.NOT_FOUND, CoverageStatus.UNKNOWN, CoverageStatus.REVIEW_REQUIRED}:
         return status
     detail = fact.limit or fact.waiting_period or fact.copay or fact.deductible
     if not detail and fact.value:
