@@ -1,116 +1,459 @@
-"""Explainable, deterministic policy-fit scoring.
+"""Deterministic policy-fit scoring.
 
-fit = 100 * clip(0.60*coverage + 0.15*evidence_strength - 0.15*exclusion_risk - 0.10*uncertainty)
-Every component is reported with its weight, value, contribution and a plain-language explanation.
-This is a decision-support metric, not objective truth.
+Fit is the weighted mean of criterion scores on requirements the brochure actually addresses.
+Missing evidence is left out of that mean. It lowers evidence completeness instead.
+Completeness is not added to fit. It is a decision-sufficiency gate.
 
-A baseline scenario counts only when at least half the policies actually document it, so a longer
-brochure does not win by mentioning features the others never had a chance to be scored on.
-A scenario the advisor asked for always counts: silence there is a neutral 0.5 plus an uncertainty
-penalty, never a free point for the policy that happens to have more pages.
+Decision status:
+- INELIGIBLE: a must-have has explicit exclusion, a rejected add-on, a score below
+  must_have_fail_below, or unresolved evidence while another policy does evidence it.
+- INCOMPLETE: no must-have failure, but completeness is below min_decision_completeness
+  or more than max_completeness_shortfall behind the most complete peer.
+  The policy stays eligible. It cannot win.
+- INCOMPLETE_COMPARISON: every policy lacks reliable evidence for the same must-have,
+  or no policy clears the sufficiency gate. There is no automatic recommendation.
+- ELIGIBLE: decision-sufficient and strictly ahead of every other sufficient policy
+  by more than close_threshold.
+- CLOSE_DECISION: two or more decision-sufficient policies are within close_threshold.
+  No policy id, name, or input order breaks the tie.
+
+fit_score = sum(weight_i * criterion_score_i) / sum(weight_i)   over evidenced requirements only
+contribution_i = (weight_i / evidenced_weight) * criterion_score_i
+Those contributions sum to fit_score.
+
+An LLM never computes these numbers. Policy id, insurer name, filename, list order,
+retrieval rank, chunk count, and brochure length are not inputs.
 """
 from __future__ import annotations
 
-from app.models.fit import FitComponent, PolicyFitResult, PolicyGap, Recommendation, Scenario, ScenarioOutcome
-from app.models.policy import CoverageStatus, PolicyDocument
+import math
 
-UNKNOWN_VALUE = 0.5  # neutral prior for NOT_FOUND / UNKNOWN scenarios inside the coverage component
-WEIGHTS = {"exposure_coverage": 0.60, "evidence_strength": 0.15, "exclusion_risk": -0.15, "uncertainty": -0.10}
+from app.models.fit import (
+    ClientRequirement,
+    CriterionScore,
+    DecisionState,
+    FitComponent,
+    PolicyFitResult,
+    PolicyGap,
+    Recommendation,
+    Scenario,
+    ScenarioOutcome,
+)
+from app.models.policy import CoverageStatus, FeatureFact, PolicyDocument, PolicyExtractionResult
+from app.policy_fit.criteria import compare_fact, expectation_for
+from app.policy_fit.requirements import requirements_from_scenarios
+from app.policy_fit.scoring_config import DEFAULT_SCORING, ScoringConfig
 
-
-def score_policy(policy_id: str, scenarios: list[Scenario], outcomes: list[ScenarioOutcome], gaps: list[PolicyGap]) -> PolicyFitResult:
-    sc_by_id = {s.scenario_id: s for s in scenarios}
-    mine = [o for o in outcomes if o.policy_id == policy_id]
-    evaluated = [o for o in mine if o.value is not None]
-    unknown = [o for o in mine if o.value is None]
-    all_w = sum(sc_by_id[o.scenario_id].weight for o in mine) or 1.0
-    coverage = sum(sc_by_id[o.scenario_id].weight * (o.value if o.value is not None else UNKNOWN_VALUE) for o in mine) / all_w if mine else 0.0
-
-    # evidence strength: share of evaluated outcomes with sources, blended with mean retrieval relevance
-    with_src = [o for o in evaluated if o.sources]
-    citation_completeness = len(with_src) / len(evaluated) if evaluated else 0.0
-    rel = [s.retrieval_relevance for o in with_src for s in o.sources if s.retrieval_relevance is not None]
-    mean_rel = sum(rel) / len(rel) if rel else 0.0
-    evidence_strength = 0.6 * citation_completeness + 0.4 * min(1.0, mean_rel)
-
-    exclusion_risk = sum(sc_by_id[o.scenario_id].weight for o in mine if o.status == CoverageStatus.EXCLUDED) / all_w
-    uncertainty = sum(sc_by_id[o.scenario_id].weight for o in unknown) / all_w
-
-    components = [
-        FitComponent(name="exposure_coverage", value=round(coverage, 3), weight=WEIGHTS["exposure_coverage"], contribution=round(WEIGHTS["exposure_coverage"] * coverage, 3),
-                     explanation=f"Weighted coverage across all {len(mine)} scenarios (covered=1, conditional~0.75, partial=0.5, add-on=0.35, excluded=0; the {len(unknown)} not addressed by the brochure count a neutral 0.5)."),
-        FitComponent(name="evidence_strength", value=round(evidence_strength, 3), weight=WEIGHTS["evidence_strength"], contribution=round(WEIGHTS["evidence_strength"] * evidence_strength, 3),
-                     explanation=f"{len(with_src)}/{len(evaluated)} outcomes cite brochure evidence; mean retrieval relevance {mean_rel:.2f} (a ranking signal, not accuracy)."),
-        FitComponent(name="exclusion_risk", value=round(exclusion_risk, 3), weight=WEIGHTS["exclusion_risk"], contribution=round(WEIGHTS["exclusion_risk"] * exclusion_risk, 3),
-                     explanation="Share of scenario weight that hits an explicit exclusion."),
-        FitComponent(name="uncertainty", value=round(uncertainty, 3), weight=WEIGHTS["uncertainty"], contribution=round(WEIGHTS["uncertainty"] * uncertainty, 3),
-                     explanation=f"{len(unknown)} of {len(mine)} scenarios are NOT_FOUND/UNKNOWN in the brochure (penalised, but never treated as excluded)."),
-    ]
-    raw = sum(c.contribution for c in components)
-    score = round(max(0.0, min(1.0, raw)) * 100, 1)
-    confidence = "HIGH" if uncertainty < 0.2 and citation_completeness > 0.8 else "MEDIUM" if uncertainty < 0.5 else "LOW"
-    high_gaps = [g for g in gaps if g.policy_id == policy_id and g.severity == "HIGH"]
-    explanation = [
-        f"Covers {sum(1 for o in evaluated if o.status == CoverageStatus.COVERED)} of {len(mine)} client scenarios outright; {sum(1 for o in evaluated if o.status == CoverageStatus.CONDITIONAL)} with conditions; {sum(1 for o in evaluated if o.status == CoverageStatus.ADD_ON)} only via add-ons.",
-        f"{len(unknown)} scenarios could not be assessed from the brochure (uncertainty penalty).",
-        f"{len(high_gaps)} high-severity gaps identified." if high_gaps else "No high-severity gaps identified from the brochure evidence.",
-    ]
-    return PolicyFitResult(policy_id=policy_id, score=score, components=components, explanation=explanation, evaluated_scenarios=len(evaluated), unknown_scenarios=len(unknown), confidence=confidence)
+_MISSING_STATUS = {"NOT_FOUND", "UNKNOWN", "REVIEW_REQUIRED"}
 
 
-def _ranking_scenarios(policy_ids: list[str], scenarios: list[Scenario], outcomes: list[ScenarioOutcome]) -> list[Scenario]:
-    """Drop baseline items only one brochure mentions. Keep anything the client asked for."""
-    ids = set(policy_ids)
-    needed = max(2, (len(policy_ids) + 1) // 2)
-    by_scenario: dict[str, list[ScenarioOutcome]] = {}
-    for outcome in outcomes:
-        if outcome.policy_id in ids:
-            by_scenario.setdefault(outcome.scenario_id, []).append(outcome)
-    kept = []
-    for scenario in scenarios:
-        rows = by_scenario.get(scenario.scenario_id, [])
-        documented = sum(1 for row in rows if row.value is not None)
-        if scenario.client_asked or documented >= needed:
-            kept.append(scenario)
-    return kept or list(scenarios)
+def score_policies(
+    policy_ids: list[str],
+    requirements: list[ClientRequirement],
+    results: dict[str, PolicyExtractionResult],
+    gaps: list[PolicyGap] | None = None,
+    config: ScoringConfig | None = None,
+) -> list[PolicyFitResult]:
+    books = {pid: dict(results[pid].facts) if pid in results else {} for pid in policy_ids}
+    return _score_books(policy_ids, requirements, books, gaps or [], config or DEFAULT_SCORING)
 
 
 def score_all(policy_ids: list[str], scenarios: list[Scenario], outcomes: list[ScenarioOutcome], gaps: list[PolicyGap]) -> list[PolicyFitResult]:
-    comparable = _ranking_scenarios(policy_ids, scenarios, outcomes)
-    comparable_ids = {s.scenario_id for s in comparable}
-    outcomes = [o for o in outcomes if o.scenario_id in comparable_ids and o.policy_id in set(policy_ids)]
-    results = [score_policy(pid, comparable, outcomes, gaps) for pid in policy_ids]
-    # Highest score wins. An exact tie breaks on policy id, not on catalog order
-    # (HDFC is filed as "Policy A", so a stable sort would have preferred it).
-    results.sort(key=lambda r: (-r.score, r.policy_id))
-    for r in results:
-        r.close_call_with = [o.policy_id for o in results if o.policy_id != r.policy_id and abs(o.score - r.score) <= 5.0]
-    return results
+    requirements = requirements_from_scenarios(scenarios)
+    by_scenario = {s.scenario_id: s for s in scenarios}
+    books: dict[str, dict[str, FeatureFact]] = {pid: {} for pid in policy_ids}
+    for outcome in outcomes:
+        if outcome.policy_id not in books:
+            continue
+        scenario = by_scenario.get(outcome.scenario_id)
+        feature = scenario.feature_keys[0] if scenario and scenario.feature_keys else "in_patient_hospitalisation"
+        books[outcome.policy_id][outcome.scenario_id] = _fact_from_outcome(outcome, feature)
+    return _score_books(policy_ids, requirements, books, gaps, DEFAULT_SCORING)
 
 
-def recommend(fits: list[PolicyFitResult], gaps: list[PolicyGap], docs: dict[str, PolicyDocument], assumptions: list[str] | None = None) -> Recommendation:
+def score_policy(policy_id: str, scenarios: list[Scenario], outcomes: list[ScenarioOutcome], gaps: list[PolicyGap]) -> PolicyFitResult:
+    return score_all([policy_id], scenarios, outcomes, gaps)[0]
+
+
+def recommend(
+    fits: list[PolicyFitResult],
+    gaps: list[PolicyGap],
+    docs: dict[str, PolicyDocument],
+    assumptions: list[str] | None = None,
+    advisor_choice: str | None = None,
+) -> Recommendation:
     if not fits:
         raise ValueError("No policy fit results to recommend from")
-    best = fits[0]
-    runner = fits[1] if len(fits) > 1 else None
-    doc = docs.get(best.policy_id)
-    name = doc.policy_name if doc else best.policy_id
-    rationale = [f"Highest policy-fit score ({best.score}/100) across the client's scenarios."] + best.explanation
+    if advisor_choice:
+        chosen = next(f for f in fits if f.policy_id == advisor_choice)
+        return _named(chosen, fits, gaps, docs, assumptions, DecisionState.ADVISOR_OVERRIDE, [])
+
+    top = fits[0]
+    peers = [top] + [f for f in fits if f.policy_id in top.close_call_with]
+    base_assumptions = [
+        "All four documents are retail individual/family-floater product brochures; group/corporate terms are not stated. The recommendation assumes a voluntary or employee-choice retail plan facilitated by Marsh.",
+        "Brochure content is summary-level; the policy wording prevails.",
+    ]
+    shared_assumptions = base_assumptions + list(assumptions or [])
+    if fits and all(not fit.eligible for fit in fits):
+        return _unresolved(top, fits, docs, gaps, shared_assumptions, DecisionState.NOT_ELIGIBLE, "A must-have requirement failed or is missing where another policy has evidence. The failure is not averaged away.")
+    if top.decision_state == DecisionState.CLOSE_DECISION.value:
+        return _unresolved(top, peers, docs, gaps, shared_assumptions, DecisionState.CLOSE_DECISION, "Scores are within the close threshold. No insurer name, policy id, or file order is used to pick a winner.")
+    if top.decision_state in {DecisionState.INCOMPLETE_COMPARISON.value, DecisionState.INCOMPLETE.value} or not top.decision_sufficient:
+        reason = "The comparison is not sufficient for an automatic recommendation."
+        if top.unresolved_must_haves:
+            reason = "Unresolved must-have: " + ", ".join(top.unresolved_must_haves) + ". It is not treated as satisfied or failed. Advisor review is required."
+        elif top.comparison_incomplete:
+            reason = "Comparison incomplete for: " + ", ".join(top.comparison_incomplete) + ". No automatic recommendation."
+        else:
+            reason = "No policy clears the evidence-completeness gate. Missing rows are not dropped in a way that creates a winner."
+        return _unresolved(top, peers or fits, docs, gaps, shared_assumptions, DecisionState.INCOMPLETE_COMPARISON, reason)
+    if not top.eligible:
+        return _unresolved(top, peers or fits, docs, gaps, shared_assumptions, DecisionState.NOT_ELIGIBLE, "A must-have requirement failed or is missing where another policy has evidence. The failure is not averaged away.")
+    return _named(top, fits, gaps, docs, assumptions, DecisionState.ELIGIBLE, [])
+
+
+def _score_books(
+    policy_ids: list[str],
+    requirements: list[ClientRequirement],
+    books: dict[str, dict[str, FeatureFact]],
+    gaps: list[PolicyGap],
+    config: ScoringConfig,
+) -> list[PolicyFitResult]:
+    fits = [_one(pid, requirements, books.get(pid, {}), gaps, config) for pid in policy_ids]
+    _apply_comparison_sufficiency(fits)
+    _apply_decision_gate(fits, config)
+    return _rank(fits, config)
+
+
+def _one(policy_id: str, requirements: list[ClientRequirement], book: dict[str, FeatureFact], gaps: list[PolicyGap], config: ScoringConfig) -> PolicyFitResult:
+    rows: list[CriterionScore] = []
+    for req in requirements:
+        fact = book.get(req.requirement_id) or book.get(req.feature)
+        judgement = compare_fact(req, fact, config)
+        evidence = None
+        page = None
+        chunk = None
+        if fact is not None and fact.sources:
+            evidence = fact.original_quote or fact.sources[0].source_text
+            page = fact.sources[0].page
+            chunk = fact.sources[0].chunk_id
+        elif fact is not None:
+            evidence = fact.original_quote or fact.value
+            page = fact.source_page
+            chunk = fact.source_chunk_id
+        rows.append(
+            CriterionScore(
+                requirement_id=req.requirement_id,
+                feature=req.feature,
+                description=req.description,
+                requirement_class=req.requirement_class.value,
+                type=req.type.value,
+                weight=req.weight,
+                criterion_score=judgement.score,
+                status=judgement.status.value,
+                evidence=evidence,
+                source_page=page,
+                source_chunk_id=chunk,
+                must_have_gap=judgement.must_have_gap,
+                explicit_exclusion=judgement.explicit_exclusion,
+                unresolved=judgement.unresolved,
+                coverage_expectation=expectation_for(req).value,
+                condition_materiality=judgement.condition_materiality,
+                note=judgement.note,
+            )
+        )
+    evidenced = [row for row in rows if row.criterion_score is not None]
+    evidenced_weight = sum(_safe_weight(row.weight) for row in evidenced)
+    completeness = sum(_safe_weight(row.weight) for row in rows if row.criterion_score is not None)
+    if evidenced_weight <= 0 or not math.isfinite(evidenced_weight):
+        fit = 0.0
+    else:
+        fit = sum(_safe_weight(row.weight) * _safe_score(row.criterion_score) for row in evidenced) / evidenced_weight
+    if not math.isfinite(fit):
+        fit = 0.0
+    fit = min(100.0, max(0.0, fit))
+    for row in rows:
+        if row.criterion_score is None or evidenced_weight <= 0:
+            row.contribution = None
+        else:
+            row.contribution = (_safe_weight(row.weight) / evidenced_weight) * _safe_score(row.criterion_score)
+    score = round(fit, 4)
+    credited = [row for row in rows if row.contribution is not None]
+    for row in credited:
+        row.contribution = round(row.contribution or 0.0, 4)
+    if credited:
+        drift = round(score - sum(row.contribution or 0.0 for row in credited), 4)
+        credited[-1].contribution = round((credited[-1].contribution or 0.0) + drift, 4)
+
+    client_rows = [row for row in rows if row.requirement_class != "BASELINE"]
+    client_resolved = all(not row.unresolved for row in client_rows)
+    gaps_found = [row.feature for row in rows if row.must_have_gap]
+    eligible = not gaps_found
+    unresolved = [row.feature for row in rows if row.unresolved]
+    exclusions = [row.feature for row in rows if row.explicit_exclusion]
+    if completeness >= config.confidence_high_completeness and eligible:
+        confidence = "HIGH"
+    elif completeness >= config.confidence_medium_completeness:
+        confidence = "MEDIUM"
+    else:
+        confidence = "LOW"
+    high_gaps = [g for g in gaps if g.policy_id == policy_id and g.severity == "HIGH"]
+    explanation = [
+        f"Fit {score}/100 is the weighted mean of {len(evidenced)} evidenced requirements. {len(unresolved)} requirements have no brochure evidence and are omitted from the mean.",
+        f"Evidence completeness is {completeness:.0%} of requirement weight. It is not added to the fit score.",
+    ]
+    if exclusions:
+        explanation.append("Explicit exclusions: " + ", ".join(exclusions) + ". These score 0. They are not the same as missing evidence.")
+    if gaps_found:
+        explanation.append("Must-have gaps: " + ", ".join(gaps_found) + ".")
+    elif high_gaps:
+        explanation.append(f"{len(high_gaps)} high-severity gaps identified.")
+    else:
+        explanation.append("No must-have gap identified from the brochure evidence.")
+    for row in rows:
+        if row.contribution is None:
+            explanation.append(f"{row.feature} [{row.requirement_class}] weight {row.weight:.0%}: {row.status}. No contribution. {row.note}")
+        else:
+            explanation.append(
+                f"{row.feature} [{row.requirement_class}] weight {row.weight:.0%} × {row.criterion_score:.0f} = {row.contribution:.2f}. {row.note}"
+            )
+    components = [
+        FitComponent(
+            name="requirement_fit",
+            value=round(score / 100.0, 4),
+            weight=1.0,
+            contribution=round(score / 100.0, 4),
+            explanation="Weighted mean of evidenced criterion scores, on a 0-1 scale. Contributions on each requirement sum back to the 0-100 fit score.",
+        ),
+        FitComponent(
+            name="evidence_completeness",
+            value=round(completeness, 4),
+            weight=0.0,
+            contribution=0.0,
+            explanation="Share of requirement weight with a brochure fact. Weight 0 so it cannot change the fit score. Retrieval rank is not used.",
+        ),
+    ]
+    return PolicyFitResult(
+        policy_id=policy_id,
+        score=score,
+        components=components,
+        explanation=explanation,
+        evaluated_scenarios=len(evidenced),
+        unknown_scenarios=len(unresolved),
+        confidence=confidence,
+        evidence_completeness=round(completeness, 4),
+        eligible=eligible,
+        must_have_gaps=gaps_found,
+        unresolved=unresolved,
+        explicit_exclusions=exclusions,
+        contributions=rows,
+        client_requirements_resolved=client_resolved,
+        decision_sufficient=eligible,
+    )
+
+
+def _apply_comparison_sufficiency(fits: list[PolicyFitResult]) -> None:
+    """If every policy is NOT_FOUND on a requirement, that requirement is comparison-incomplete.
+
+    It is not a must-have gap, and it does not make every policy ineligible.
+    """
+    if not fits:
+        return
+    width = len(fits[0].contributions)
+    for index in range(width):
+        rows = [fit.contributions[index] for fit in fits if index < len(fit.contributions)]
+        if len(rows) != len(fits):
+            continue
+        if all(row.criterion_score is None and row.status in _MISSING_STATUS for row in rows):
+            for row in rows:
+                row.comparison_incomplete = True
+                row.must_have_gap = False
+                row.note = f"{row.note} COMPARISON_INCOMPLETE: no policy evidences this requirement.".strip()
+    for fit in fits:
+        fit.comparison_incomplete = [row.feature for row in fit.contributions if row.comparison_incomplete]
+        fit.must_have_gaps = [row.feature for row in fit.contributions if row.must_have_gap]
+        fit.unresolved = [row.feature for row in fit.contributions if row.unresolved or row.comparison_incomplete]
+        fit.unresolved_must_haves = [
+            row.feature for row in fit.contributions
+            if row.requirement_class == "MUST_HAVE" and (row.must_have_gap or row.comparison_incomplete or row.unresolved or row.criterion_score is None)
+        ]
+        fit.explicit_exclusions = [row.feature for row in fit.contributions if row.explicit_exclusion]
+        fit.eligible = not fit.must_have_gaps
+        client_rows = [row for row in fit.contributions if row.requirement_class != "BASELINE"]
+        fit.client_requirements_resolved = all(
+            row.criterion_score is not None and not row.unresolved and not row.comparison_incomplete for row in client_rows
+        )
+        fit.explanation = [
+            line for line in fit.explanation
+            if not line.startswith("Must-have gaps") and not line.startswith("No must-have") and not line.startswith("Comparison incomplete") and not line.startswith("Unresolved must-have")
+        ]
+        if fit.must_have_gaps:
+            fit.explanation.append("Must-have gaps: " + ", ".join(fit.must_have_gaps) + ".")
+        elif fit.unresolved_must_haves:
+            fit.explanation.append(
+                "Unresolved must-have: " + ", ".join(fit.unresolved_must_haves) + ". Not satisfied and not failed. No automatic recommendation."
+            )
+        elif fit.comparison_incomplete:
+            fit.explanation.append(
+                "Comparison incomplete for: " + ", ".join(fit.comparison_incomplete) + ". No positive score and no exclusion penalty."
+            )
+        else:
+            fit.explanation.append("No must-have gap identified from the brochure evidence.")
+
+
+def _apply_decision_gate(fits: list[PolicyFitResult], config: ScoringConfig) -> None:
+    """Completeness decides who may compete. It does not change fit."""
+    if not fits:
+        return
+    open_must_haves = []
+    for fit in fits:
+        for feature in fit.comparison_incomplete:
+            row = next((item for item in fit.contributions if item.feature == feature), None)
+            if row is not None and row.requirement_class == "MUST_HAVE" and feature not in open_must_haves:
+                open_must_haves.append(feature)
+    peers = [fit for fit in fits if not fit.must_have_gaps]
+    best = max((fit.evidence_completeness for fit in peers), default=0.0)
+    for fit in fits:
+        if fit.must_have_gaps or open_must_haves:
+            fit.decision_sufficient = False
+        else:
+            shortfall = best - fit.evidence_completeness
+            below_floor = fit.evidence_completeness + 1e-9 < config.min_decision_completeness
+            behind = shortfall > config.max_completeness_shortfall + 1e-9
+            fit.decision_sufficient = not below_floor and not behind
+        if fit.decision_sufficient and fit.evidence_completeness >= config.confidence_high_completeness:
+            fit.confidence = "HIGH"
+        elif fit.evidence_completeness >= config.confidence_medium_completeness:
+            fit.confidence = "MEDIUM"
+        else:
+            fit.confidence = "LOW"
+        if not fit.decision_sufficient and not fit.must_have_gaps and not open_must_haves:
+            fit.explanation.append(
+                f"Decision-insufficient: completeness {fit.evidence_completeness:.0%} is below the gate "
+                f"(floor {config.min_decision_completeness:.0%}, shortfall limit {config.max_completeness_shortfall:.0%}). "
+                "Fit is unchanged."
+            )
+
+
+def _rank(fits: list[PolicyFitResult], config: ScoringConfig) -> list[PolicyFitResult]:
+    ranked = sorted(fits, key=lambda f: (f.decision_sufficient, not f.must_have_gaps, f.score), reverse=True)
+    if not ranked:
+        return ranked
+    sufficient = [fit for fit in ranked if fit.decision_sufficient]
+    open_must = any(fit.unresolved_must_haves and not fit.must_have_gaps for fit in ranked) and any(
+        row.comparison_incomplete and row.requirement_class == "MUST_HAVE" for fit in ranked for row in fit.contributions
+    )
+    if open_must or not sufficient:
+        state = DecisionState.NOT_ELIGIBLE if ranked and all(fit.must_have_gaps for fit in ranked) else DecisionState.INCOMPLETE_COMPARISON
+        visible = [fit.policy_id for fit in ranked if not fit.must_have_gaps] or [fit.policy_id for fit in ranked]
+        for fit in ranked:
+            if fit.must_have_gaps and state == DecisionState.NOT_ELIGIBLE:
+                fit.decision_state = DecisionState.NOT_ELIGIBLE.value
+                fit.close_call_with = []
+            elif fit.must_have_gaps:
+                fit.decision_state = DecisionState.NOT_ELIGIBLE.value
+                fit.close_call_with = []
+            else:
+                fit.decision_state = state.value
+                fit.close_call_with = [pid for pid in visible if pid != fit.policy_id]
+        return ranked
+    top = sufficient[0]
+    peers = [fit.policy_id for fit in sufficient if abs(fit.score - top.score) <= config.close_threshold]
+    state = DecisionState.CLOSE_DECISION if len(peers) > 1 else DecisionState.ELIGIBLE
+    peer_set = set(peers)
+    for fit in ranked:
+        fit.close_call_with = []
+        if fit.must_have_gaps:
+            fit.decision_state = DecisionState.NOT_ELIGIBLE.value
+        elif not fit.decision_sufficient:
+            fit.decision_state = DecisionState.INCOMPLETE.value
+        elif fit.policy_id in peer_set and len(peer_set) > 1:
+            fit.close_call_with = [pid for pid in peers if pid != fit.policy_id]
+            fit.decision_state = state.value
+        else:
+            fit.decision_state = DecisionState.ELIGIBLE.value
+    return ranked
+
+
+def _safe_weight(value: float) -> float:
+    if not math.isfinite(value) or value < 0:
+        return 0.0
+    return value
+
+
+def _safe_score(value: float | None) -> float:
+    if value is None or not math.isfinite(value):
+        return 0.0
+    return min(100.0, max(0.0, value))
+
+
+def _fact_from_outcome(outcome: ScenarioOutcome, feature: str) -> FeatureFact:
+    return FeatureFact(
+        policy_id=outcome.policy_id,
+        feature=feature,
+        coverage_status=outcome.status,
+        value=outcome.rationale or None,
+        limit=outcome.limitations[0] if outcome.limitations else None,
+        conditions=list(outcome.conditions),
+        exclusions=list(outcome.limitations) if outcome.status == CoverageStatus.EXCLUDED else [],
+        is_add_on=outcome.status == CoverageStatus.ADD_ON,
+        sources=list(outcome.sources),
+    )
+
+
+def _named(chosen, fits, gaps, docs, assumptions, state: DecisionState, competing: list[str]) -> Recommendation:
+    doc = docs.get(chosen.policy_id)
+    name = doc.policy_name if doc else chosen.policy_id
+    others = [f for f in fits if f.policy_id != chosen.policy_id]
+    runner = others[0] if others else None
+    if state == DecisionState.ADVISOR_OVERRIDE:
+        lead = f"Advisor override. {name} is pitched at fit {chosen.score}/100."
+    else:
+        lead = f"Highest fit among decision-sufficient policies ({chosen.score}/100). Evidence completeness is a separate gate and is not added to fit."
+    rationale = [lead] + chosen.explanation[:4]
     if runner:
-        rationale.append(f"Runner-up: {docs[runner.policy_id].policy_name if runner.policy_id in docs else runner.policy_id} at {runner.score}/100" + (" (close call; advisor judgement recommended)." if runner.policy_id in best.close_call_with else "."))
-    caveats = list(dict.fromkeys(g.detail for g in gaps if g.policy_id == best.policy_id and g.severity in {"HIGH", "MEDIUM"}))[:5]
-    if best.confidence == "LOW":
-        caveats.insert(0, "Low evidence confidence: many scenarios are not addressed by the brochure; confirm with the full policy wording before presenting.")
+        runner_name = docs[runner.policy_id].policy_name if runner.policy_id in docs else runner.policy_id
+        rationale.append(f"Next: {runner_name} at {runner.score}/100.")
+    caveats = list(dict.fromkeys(g.detail for g in gaps if g.policy_id == chosen.policy_id and g.severity in {"HIGH", "MEDIUM"}))[:5]
+    caveats.extend(f"Must-have gap: {feature}." for feature in chosen.must_have_gaps)
+    if chosen.confidence == "LOW":
+        caveats.insert(0, "Low evidence completeness: confirm with the full policy wording before presenting.")
     base_assumptions = [
         "All four documents are retail individual/family-floater product brochures; group/corporate terms are not stated. The recommendation assumes a voluntary or employee-choice retail plan facilitated by Marsh.",
         "Brochure content is summary-level; the policy wording prevails.",
     ]
     return Recommendation(
-        recommended_policy_id=best.policy_id,
+        recommended_policy_id=chosen.policy_id,
         policy_name=name,
-        fit_score=best.score,
+        fit_score=chosen.score,
         rationale=rationale,
         runner_up_policy_id=runner.policy_id if runner else None,
-        caveats=caveats,
+        caveats=caveats[:6],
         assumptions=base_assumptions + list(assumptions or []),
+        decision_state=state.value,
+        competing_policy_ids=competing,
+        comparison_incomplete=list(chosen.comparison_incomplete),
+        unresolved_must_haves=list(chosen.unresolved_must_haves),
+    )
+
+
+def _unresolved(top, peers, docs, gaps, assumptions, state: DecisionState, reason: str) -> Recommendation:
+    labels = {
+        DecisionState.CLOSE_DECISION: "Close decision",
+        DecisionState.INCOMPLETE_COMPARISON: "Incomplete comparison",
+        DecisionState.NOT_ELIGIBLE: "Not eligible",
+    }
+    return Recommendation(
+        recommended_policy_id="",
+        policy_name=labels.get(state, "Unresolved"),
+        fit_score=top.score,
+        rationale=[reason] + top.explanation[:3],
+        runner_up_policy_id=None,
+        caveats=[g.detail for g in gaps if g.severity == "HIGH"][:5],
+        assumptions=assumptions,
+        decision_state=state.value,
+        competing_policy_ids=[f.policy_id for f in peers],
+        comparison_incomplete=list(dict.fromkeys(feature for fit in peers for feature in fit.comparison_incomplete)),
+        unresolved_must_haves=list(dict.fromkeys(feature for fit in peers for feature in fit.unresolved_must_haves)),
     )

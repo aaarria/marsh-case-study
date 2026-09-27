@@ -19,18 +19,24 @@ from app.graph.state import AdvisoryState
 from app.models.client import ClientIntake, CompanyProfile, Exposure, FactKind
 from app.models.fit import PolicyFitResult, PolicyGap, Recommendation, ScenarioOutcome
 from app.models.pitch import AuditReport, Pitch, Slide, SlideBullet
-from app.models.policy import ComparisonMatrix, PolicyDocument, SourceRef
+from app.models.policy import ComparisonMatrix, PolicyDocument, PolicyExtractionResult, SourceRef
 from app.pitch.evidence_pack import EvidencePack, build_evidence_pack
 from app.pitch.generator import generate_pitch
 from app.pitch.pptx_builder import audit_markdown, build_pitch_deck
 from app.policies.comparison import build_matrix
+from app.policies.conditions import canonicalize_results
 from app.policies.extraction import get_policy_facts
 from app.policy_fit.arena import run_arena
 from app.policy_fit.gaps import analyse_gaps
 from app.policy_fit.scenarios import build_scenarios
-from app.policy_fit.scoring import recommend, score_all
+from app.policy_fit.requirements import build_requirements
+from app.policy_fit.scoring import recommend, score_policies
+from app.policy_fit.scoring_config import DEFAULT_SCORING
+from app.policy_fit.stress import default_retrieve, run_policy_check, unavailable_check
 from app.rag.metadata_store import SQLiteMetadataStore
 from app.research.company_research import research_company
+from app.services.llm import get_llm
+from app.research.porter import analyse_market, limited_context
 from app.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -145,6 +151,20 @@ def research_node(state: AdvisoryState) -> dict:
     return {"profile": _dump(profile)}
 
 
+@node("market_intelligence")
+def market_node(state: AdvisoryState) -> dict:
+    """Porter context. Failure stays UNKNOWN and does not touch policy scores."""
+    profile = CompanyProfile.model_validate(state["profile"])
+    try:
+        context = analyse_market(profile)
+    except Exception as exc:
+        context = limited_context(profile, f"Market context failed: {exc}")
+    warnings = list(state.get("warnings") or [])
+    if context.status != "OK":
+        warnings.append(context.note)
+    return {"market_context": context.model_dump(mode="json"), "warnings": warnings}
+
+
 CONTEXT_FIELDS = ("industry", "geography", "employee_count", "advisor_notes", "client_priorities")
 
 
@@ -175,13 +195,41 @@ def context_node(state: AdvisoryState) -> dict:
 @node("map_exposures")
 def exposures_node(state: AdvisoryState) -> dict:
     exposures = map_exposures(CompanyProfile.model_validate(state["profile"]), ClientIntake.model_validate(state["intake"]))
-    return {"exposures": _dump(exposures), "features": features_for_run(exposures)}
+    requirements = build_requirements(exposures)
+    return {"exposures": _dump(exposures), "requirements": _dump(requirements), "features": features_for_run(exposures)}
+
+
+def _canonical_facts(state: AdvisoryState) -> dict:
+    if state.get("policy_facts"):
+        return {pid: PolicyExtractionResult.model_validate(raw) for pid, raw in state["policy_facts"].items()}
+    return canonicalize_results(get_policy_facts(state["policy_ids"]))
+
+
+@node("policy_intelligence")
+def policy_intelligence_node(state: AdvisoryState) -> dict:
+    """Load each policy's cached facts independently, then validate them into one FeatureFact book."""
+    warnings = list(state.get("warnings") or [])
+    books = {}
+    for pid in state["policy_ids"]:
+        try:
+            loaded = get_policy_facts([pid])
+        except Exception as exc:
+            warnings.append(f"Policy evidence unavailable for {pid}: {exc}. Missing evidence is not fabricated.")
+            continue
+        if pid not in loaded:
+            warnings.append(f"Policy evidence missing for {pid}. Comparison continues with that policy unresolved.")
+            continue
+        books[pid] = loaded[pid]
+    if not books:
+        raise RuntimeError("No policy facts available. Run `python scripts/ingest_policies.py --extract` first.")
+    canonical = canonicalize_results(books)
+    return {"policy_facts": {pid: result.model_dump(mode="json") for pid, result in canonical.items()}, "warnings": warnings}
 
 
 @node("compare_policies")
 def compare_node(state: AdvisoryState) -> dict:
     pids = state["policy_ids"]
-    results = get_policy_facts(pids)
+    results = _canonical_facts(state)
     if not results:
         raise RuntimeError("No policy facts available. Run `python scripts/ingest_policies.py --extract` first.")
     matrix = build_matrix(results, state.get("features"), pids)
@@ -190,44 +238,115 @@ def compare_node(state: AdvisoryState) -> dict:
 
 @node("policy_fit_arena")
 def arena_node(state: AdvisoryState) -> dict:
+    """Deterministic recommendation. The model does not set fit or the winner."""
     pids = state["policy_ids"]
     exposures = [Exposure.model_validate(e) for e in state["exposures"]]
-    results = get_policy_facts(pids)
+    results = _canonical_facts(state)
+    requirements = build_requirements(exposures)
     scenarios = build_scenarios(exposures)
     outcomes = run_arena(scenarios, results)
     gaps = analyse_gaps(scenarios, outcomes, exposures)
-    fits = score_all(pids, scenarios, outcomes, gaps)
+    fits = score_policies(pids, requirements, results, gaps)
     rec = recommend(fits, gaps, _docs(pids))
-    return {"scenarios": _dump(scenarios), "outcomes": _dump(outcomes), "gaps": _dump(gaps), "fits": _dump(fits), "recommendation": _dump(rec)}
+    return {
+        "scenarios": _dump(scenarios),
+        "outcomes": _dump(outcomes),
+        "gaps": _dump(gaps),
+        "fits": _dump(fits),
+        "requirements": _dump(requirements),
+        "recommendation": _dump(rec),
+        "provisional_recommendation": _dump(rec),
+    }
+
+
+@node("policy_check")
+def policy_check_node(state: AdvisoryState) -> dict:
+    """Challenge the provisional recommendation. Recalculation, when it happens, is the same scorer."""
+    provisional = Recommendation.model_validate(state.get("provisional_recommendation") or state["recommendation"])
+    try:
+        exposures = [Exposure.model_validate(e) for e in state["exposures"]]
+        requirements = build_requirements(exposures)
+        results = _canonical_facts(state)
+        fits = [PolicyFitResult.model_validate(f) for f in state["fits"]]
+        checked, final, new_fits, history = run_policy_check(
+            state["policy_ids"],
+            requirements,
+            results,
+            fits,
+            provisional,
+            _docs(state["policy_ids"]),
+            exposures,
+            retrieve=default_retrieve,
+            llm=get_llm(),
+        )
+    except Exception as exc:
+        checked = unavailable_check(provisional, str(exc))
+        final, new_fits, history = provisional, [PolicyFitResult.model_validate(f) for f in state["fits"]], []
+    prior = list(state.get("recommendation_history") or [])
+    return {
+        "policy_check": checked.model_dump(mode="json"),
+        "recommendation": _dump(final),
+        "fits": _dump(new_fits),
+        "recommendation_history": prior + [event.model_dump(mode="json") for event in history],
+    }
 
 
 @node("confirm_recommendation")
 def close_call_node(state: AdvisoryState) -> dict:
-    """When the top two fit scores are within the close-call margin, the advisor picks; otherwise the score stands."""
+    """Pause when scores are close, evidence is incomplete, or a must-have failed. Otherwise the score stands."""
     fits = [PolicyFitResult.model_validate(f) for f in state["fits"]]
     best = fits[0]
-    if not best.close_call_with or state.get("recommendation_confirmed"):
+    unresolved = best.decision_state in {"close_decision", "incomplete_comparison", "incomplete", "not_eligible"}
+    if state.get("recommendation_confirmed") or not (unresolved or best.close_call_with):
         return {"recommendation_confirmed": True}
     docs = _docs(state["policy_ids"])
     by_id = {f.policy_id: f for f in fits}
-    tied = [best.policy_id, *best.close_call_with]
+    tied = [best.policy_id, *best.close_call_with] if best.close_call_with else [f.policy_id for f in fits]
+    scores = [by_id[pid].score for pid in tied]
+    unique_leader = max(scores) - min(scores) > 0
+    options = [{"id": pid, "label": docs[pid].policy_name if pid in docs else pid, "score": by_id[pid].score, "confidence": by_id[pid].confidence, "explanation": by_id[pid].explanation[:3]} for pid in tied]
+    if unique_leader:
+        options.append({"id": "keep", "label": "Let the score decide"})
+    if best.decision_state == "not_eligible":
+        message = "Every policy fails a must-have requirement. Pick one to pitch anyway, or stop and revise the requirement."
+    elif best.decision_state in {"incomplete_comparison", "incomplete"}:
+        message = "The brochures do not support an automatic recommendation. Missing evidence is not cover, and an unresolved must-have is not a pass or a fail. Pick a policy only as an explicit override."
+    else:
+        message = f"{len(tied)} policies score within {DEFAULT_SCORING.close_threshold:g} fit points. Pick one. The score is not broken by policy name or file order."
     answer = ask(
         state,
         "confirm_recommendation",
-        {
-            "question": "close_call",
-            "message": f"{len(tied)} policies score within 5 fit points of each other. Pick one, or let the score decide.",
-            "options": [*({"id": pid, "label": docs[pid].policy_name if pid in docs else pid, "score": by_id[pid].score, "confidence": by_id[pid].confidence, "explanation": by_id[pid].explanation[:3]} for pid in tied), {"id": "keep", "label": "Let the score decide"}],
-            "recommended": best.policy_id,
-        },
+        {"question": "close_call", "message": message, "options": options, "recommended": best.policy_id if unique_leader else None},
     )
     choice = answer["action"]
-    if choice in ("keep", best.policy_id):
+    gap_models = [PolicyGap.model_validate(g) for g in state["gaps"]]
+    if choice == "keep" and unique_leader:
+        leader = max(tied, key=lambda pid: by_id[pid].score)
+        rec = recommend(fits, gap_models, docs, advisor_choice=leader)
+        rec.decision_state = "eligible"
+        rec.rationale[0] = f"Score decides: {rec.policy_name} at {by_id[leader].score}/100."
+        reordered = [by_id[leader], *(f for f in fits if f.policy_id != leader)]
+        return {"fits": _dump(reordered), "recommendation": _dump(rec), "recommendation_confirmed": True, "recommendation_history": _history(state, best.policy_id, leader, "Advisor accepted the score leader.", rec)}
+    if choice not in by_id:
         return {"recommendation_confirmed": True}
     reordered = [by_id[choice], *(f for f in fits if f.policy_id != choice)]
-    rec = recommend(reordered, [PolicyGap.model_validate(g) for g in state["gaps"]], docs)
-    rec.rationale[0] = f"Advisor's choice ({by_id[choice].score}/100); {docs[best.policy_id].policy_name if best.policy_id in docs else best.policy_id} scored {best.score}/100, within the close-call margin."
-    return {"fits": _dump(reordered), "recommendation": _dump(rec), "recommendation_confirmed": True}
+    rec = recommend(reordered, gap_models, docs, advisor_choice=choice)
+    other = docs[best.policy_id].policy_name if best.policy_id in docs else best.policy_id
+    rec.rationale[0] = f"Advisor's choice ({by_id[choice].score}/100); {other} scored {best.score}/100, within the close-call margin."
+    return {"fits": _dump(reordered), "recommendation": _dump(rec), "recommendation_confirmed": True, "recommendation_history": _history(state, best.policy_id, choice, "Advisor override.", rec)}
+
+
+def _history(state: AdvisoryState, previous: str, chosen: str, reason: str, rec: Recommendation) -> list[dict]:
+    prior = list(state.get("recommendation_history") or [])
+    prior.append({
+        "previous_policy_id": previous,
+        "reason": reason,
+        "evidence_change": [],
+        "recalculated_policy_id": chosen,
+        "decision_state": rec.decision_state,
+        "advisor_override": chosen,
+    })
+    return prior
 
 
 @node("evidence_pack")

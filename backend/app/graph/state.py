@@ -20,7 +20,13 @@ class AdvisoryState(TypedDict, total=False):
     gaps: list[dict[str, Any]]
     fits: list[dict[str, Any]]
     recommendation: dict[str, Any]
+    provisional_recommendation: dict[str, Any]
+    recommendation_history: list[dict[str, Any]]
     recommendation_confirmed: bool  # close call resolved (by the advisor or by the score)
+    market_context: dict[str, Any]
+    requirements: list[dict[str, Any]]
+    policy_facts: dict[str, Any]
+    policy_check: dict[str, Any]
     evidence_pack: dict[str, Any]
     # pitch & audit
     pitch: dict[str, Any]

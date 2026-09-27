@@ -44,16 +44,13 @@ def evaluate_scenario(scenario: Scenario, fact: FeatureFact) -> ScenarioOutcome:
     if scenario.feature_keys[0] in TERMS_FEATURES and status == CoverageStatus.COVERED:
         status = CoverageStatus.CONDITIONAL
         value = 0.75
-    conditions = list(fact.conditions)
+    conditions = list(dict.fromkeys(fact.conditions))
     if fact.waiting_period:
         conditions.append(f"Waiting period: {fact.waiting_period}")
     if fact.is_add_on:
         conditions.append("Optional / add-on cover at extra premium")
     if fact.variant_scope:
         conditions.append(f"Variant scope: {fact.variant_scope}")
-    # condition severity reduces the conditional value slightly
-    if status == CoverageStatus.CONDITIONAL and value is not None:
-        value = max(0.5, 0.75 - 0.05 * min(len(conditions), 4))
     limitations = []
     if fact.limit:
         limitations.append(fact.limit)

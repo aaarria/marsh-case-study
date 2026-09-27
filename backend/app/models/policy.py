@@ -35,6 +35,20 @@ class CoverageStatus(str, Enum):
     REVIEW_REQUIRED = "REVIEW_REQUIRED"
 
 
+class ConditionMateriality(str, Enum):
+    """How much a stated condition changes the benefit. Unlabeled text is not assigned a rank."""
+
+    INFO = "INFO"
+    MINOR = "MINOR"
+    MATERIAL = "MATERIAL"
+    CRITICAL = "CRITICAL"
+
+
+class FactCondition(BaseModel):
+    text: str
+    materiality: ConditionMateriality = ConditionMateriality.INFO
+
+
 class AvailabilityMode(str, Enum):
     """How the benefit is offered. Distinct from retrieval relevance and from fit score."""
 
@@ -157,6 +171,7 @@ class FeatureFact(BaseModel):
     sublimit: str | None = None
     exclusions: list[str] = Field(default_factory=list)
     conditions: list[str] = Field(default_factory=list)
+    condition_details: list[FactCondition] = Field(default_factory=list)
     is_add_on: bool = False
     add_on_required: bool = False
     variant_scope: str | None = None  # e.g. "VIP+ only"

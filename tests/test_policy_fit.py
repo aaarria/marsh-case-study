@@ -59,13 +59,16 @@ def test_not_found_is_not_excluded_in_scoring():
     gaps = analyse_gaps(scenarios, outcomes, _exposures())
     fits = score_all(["A", "B", "C"], scenarios, outcomes, gaps)
     by = {f.policy_id: f for f in fits}
-    # B (maternity NOT_FOUND) must score higher on exclusion_risk than A (maternity EXCLUDED)
-    excl = {pid: next(c for c in f.components if c.name == "exclusion_risk").value for pid, f in by.items()}
-    assert excl["A"] > 0 and excl["B"] == 0
-    unc = {pid: next(c for c in f.components if c.name == "uncertainty").value for pid, f in by.items()}
-    assert unc["B"] > 0
+    a_mat = next(row for row in by["A"].contributions if row.feature == "maternity")
+    b_mat = next(row for row in by["B"].contributions if row.feature == "maternity")
+    assert a_mat.explicit_exclusion and a_mat.criterion_score == 0
+    assert b_mat.unresolved and b_mat.criterion_score is None and b_mat.contribution is None
+    assert b_mat.criterion_score != 0 and a_mat.status == "EXCLUDED" and b_mat.status == "NOT_FOUND"
     assert all(0 <= f.score <= 100 for f in fits)
-    assert all(len(f.components) == 4 and f.explanation for f in fits)
+    for fit in fits:
+        credited = [row.contribution for row in fit.contributions if row.contribution is not None]
+        assert abs(sum(credited) - fit.score) < 0.05
+        assert fit.explanation
 
 
 def test_same_scenarios_for_every_policy():
@@ -167,13 +170,25 @@ def test_priorities_change_the_recommendation():
     maternity = explain_recommendation("Acme", ["maternity"], results, docs)
     ayush = explain_recommendation("Acme", ["ayush"], results, docs)
     assert maternity["recommended_policy"] == "Care Supreme"
+    assert maternity["decision_state"] == "eligible"
+    assert maternity["competing_policy_ids"] == []
     assert ayush["recommended_policy"] == "HDFC ERGO Optima Secure+"
     assert maternity["recommended_policy"] != ayush["recommended_policy"]
-    scores = {name: row["score"] for name, row in maternity["policies"].items()}
-    assert maternity["recommended_policy"] == max(scores, key=scores.get)
+    care = maternity["policies"]["Care Supreme"]
+    hdfc = maternity["policies"]["HDFC ERGO Optima Secure+"]
+    silent = maternity["policies"]["ABHI Activ One"]
+    assert care["score"] > hdfc["score"]
+    assert care["decision_sufficient"] and not silent["decision_sufficient"]
+    assert silent["eligible"] and silent["evidence_completeness"] < care["evidence_completeness"]
+    assert "maternity" in silent["unresolved"] and "maternity" not in silent["must_have_gaps"]
+    assert maternity["scoring_config"]["deductible_formula"].startswith("score(A)")
+    assert silent["why"]
     for name in POLICIES.values():
         row = maternity["policies"][name]
-        assert set(row["components"]) == {"exposure_coverage", "evidence_strength", "exclusion_risk", "uncertainty"}
+        assert "requirement_fit" in row["components"] and "evidence_completeness" in row["components"]
+        credited = [c["contribution"] for c in row["contributions"] if c["contribution"] is not None]
+        assert abs(sum(credited) - row["score"]) < 0.05
+    assert abs(maternity["weights_sum"] - 1) < 1e-6
 
 
 def test_tie_does_not_prefer_hdfc():
@@ -184,7 +199,11 @@ def test_tie_does_not_prefer_hdfc():
     outcomes = run_arena(scenarios, results)
     fits = score_all(["hdfc_optima_secure_plus", "abhi_activ_one"], scenarios, outcomes, [])
     assert fits[0].score == fits[1].score
-    assert fits[0].policy_id == "abhi_activ_one"
+    docs = {pid: PolicyDocument(policy_id=pid, policy_name=pid, insurer="x", document_path="p", file_name="f") for pid in facts}
+    rec = recommend(fits, [], docs)
+    assert rec.recommended_policy_id == ""
+    assert rec.decision_state in {"close_decision", "incomplete_comparison"}
+    assert set(rec.competing_policy_ids) == set(facts)
 
 
 def test_extra_pages_do_not_win_the_comparison():
@@ -210,5 +229,14 @@ def test_extra_pages_do_not_win_the_comparison():
     assert abs(tied["full"].score - tied["thin"].score) < 5
 
     outcomes += [row("thin", asked, CoverageStatus.NOT_FOUND, None), row("full", asked, CoverageStatus.COVERED, 1.0)]
-    asked_fits = {f.policy_id: f for f in score_all(["thin", "full"], shared + only_long + [asked], outcomes, [])}
-    assert asked_fits["full"].score > asked_fits["thin"].score
+    ordered = score_all(["thin", "full"], shared + only_long + [asked], outcomes, [])
+    by = {f.policy_id: f for f in ordered}
+    assert by["full"].client_requirements_resolved
+    assert not by["thin"].client_requirements_resolved
+    assert by["thin"].eligible and by["full"].eligible
+    assert "maternity" in by["thin"].unresolved
+    assert "maternity" not in by["thin"].must_have_gaps
+    assert by["thin"].evidence_completeness < by["full"].evidence_completeness
+    assert abs(by["full"].score - by["thin"].score) < 5
+    assert by["thin"].decision_sufficient is False
+    assert recommend(ordered, [], {}).recommended_policy_id == "full"
