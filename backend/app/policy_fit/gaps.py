@@ -40,14 +40,16 @@ def analyse_gaps(scenarios: list[Scenario], outcomes: list[ScenarioOutcome], exp
         exp = exp_by_id.get(sc.exposure_id)
         feature = FEATURE_LABELS.get(sc.feature_keys[0], sc.feature_keys[0])
         severity = SEVERITY_BY_STATUS.get(o.status, "LOW")
-        if exp and exp.priority >= 1.5 and severity == "MEDIUM":
+        if exp and ("advisor_priority" in (exp.basis or []) or exp.title.lower().startswith("advisor priority")) and severity == "MEDIUM":
             severity = "HIGH"
+        if o.status == CoverageStatus.NOT_FOUND and not (exp and ("advisor_priority" in (exp.basis or []) or exp.title.lower().startswith("advisor priority"))):
+            severity = "LOW"
         if o.status == CoverageStatus.CONDITIONAL and not o.conditions:
             continue
         if o.status == CoverageStatus.EXCLUDED:
             detail = f"{feature} is explicitly excluded; exposure '{exp.title if exp else sc.title}' remains unresolved."
         elif o.status in {CoverageStatus.NOT_FOUND, CoverageStatus.UNKNOWN}:
-            detail = f"The brochure does not address {feature}; exposure '{exp.title if exp else sc.title}' cannot be confirmed as covered (unknown, not excluded)."
+            detail = "Not specified in the supplied brochure."
         elif o.status == CoverageStatus.ADD_ON:
             detail = f"{feature} is only available as an optional add-on at extra premium."
         elif o.status == CoverageStatus.PARTIALLY_COVERED:

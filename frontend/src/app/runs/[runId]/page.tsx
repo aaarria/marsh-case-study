@@ -9,6 +9,7 @@ import { GateBadge, RunStatusBadge } from "@/components/status-badge";
 import { ErrorBlock, LoadingBlock } from "@/components/states";
 import { api } from "@/lib/api";
 import { shortName } from "@/lib/format";
+import { storedCompanyName } from "@/lib/intake";
 import { useRun } from "@/lib/use-run";
 import type { PolicyDocument } from "@/lib/types";
 
@@ -29,7 +30,7 @@ export default function RunPage({ params }: { params: Promise<{ runId: string }>
   return (
     <AppShell runId={runId} refreshKey={state?.run.status}>
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-hairline px-5">
-        <h1 className="truncate text-sm font-medium text-ink">{state?.run.company_name || "Pitch"}</h1>
+        <h1 className="truncate text-sm font-medium text-ink">{storedCompanyName(state?.run?.company_name) || (loading && !state ? "Loading" : !state && error ? "Unavailable" : "Pitch")}</h1>
         {state && <RunStatusBadge status={state.run.status} errorKind={state.run.error_kind} size="xs" />}
         <GateBadge gate={gate} size="xs" />
         {rec && (

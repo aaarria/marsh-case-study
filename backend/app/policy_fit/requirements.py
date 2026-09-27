@@ -33,7 +33,7 @@ _ADD_ON_OK_WORDS = ("add-on", "addon", "rider", "optional")
 def build_requirements(exposures: list[Exposure]) -> list[ClientRequirement]:
     """One requirement per feature. The stronger class wins when two exposures name the same feature."""
     chosen: dict[str, ClientRequirement] = {}
-    rank = {RequirementClass.BASELINE: 0, RequirementClass.PREFERENCE: 1, RequirementClass.MUST_HAVE: 2}
+    rank = {RequirementClass.EXPOSURE: 0, RequirementClass.BASELINE: 1, RequirementClass.PREFERENCE: 2, RequirementClass.MUST_HAVE: 3}
     for exposure in exposures:
         klass = _class_for(exposure)
         for feature in exposure.feature_keys:
@@ -82,7 +82,8 @@ def assign_weights(requirements: list[ClientRequirement], config: ScoringConfig 
     """Split weight into pools, then by each requirement's own priority_weight.
 
     If advisor requirements and baseline requirements both exist, use advisor_pool and
-    baseline_pool. Otherwise the nonempty pool gets 1.
+    baseline_pool. Otherwise the nonempty scored pool gets 1. Exposure hypotheses use
+    exposure_pool, which is 0 unless configured, so they do not enter the fit.
 
     Inside a pool:
         weight_i = pool * priority_weight_i / sum(usable priority_weight in that pool).
@@ -95,15 +96,20 @@ def assign_weights(requirements: list[ClientRequirement], config: ScoringConfig 
     cfg = config or DEFAULT_SCORING
     advisor_pool = _pool(cfg.advisor_pool, "advisor_pool")
     baseline_pool = _pool(cfg.baseline_pool, "baseline_pool")
-    client = [r for r in requirements if r.requirement_class != RequirementClass.BASELINE]
+    exposure_pool = _pool(cfg.exposure_pool, "exposure_pool")
+    client = [r for r in requirements if r.requirement_class in {RequirementClass.PREFERENCE, RequirementClass.MUST_HAVE}]
     baseline = [r for r in requirements if r.requirement_class == RequirementClass.BASELINE]
+    exposure = [r for r in requirements if r.requirement_class == RequirementClass.EXPOSURE]
     if client and baseline:
         _split(client, advisor_pool)
         _split(baseline, baseline_pool)
     elif client:
         _split(client, 1.0)
-    else:
+    elif baseline:
         _split(baseline, 1.0)
+    _split(exposure, exposure_pool if (client or baseline) else (exposure_pool or 0.0))
+    if not client and not baseline and exposure:
+        _split(exposure, exposure_pool)
     return requirements
 
 
@@ -151,7 +157,9 @@ def _class_for(exposure: Exposure) -> RequirementClass:
     stated = exposure.title.lower().startswith("advisor priority") or "advisor_priority" in (exposure.basis or [])
     if stated:
         return RequirementClass.PREFERENCE
-    return RequirementClass.BASELINE
+    if "baseline_programme" in (exposure.basis or []):
+        return RequirementClass.BASELINE
+    return RequirementClass.EXPOSURE
 
 
 def _expectation(text: str, klass: RequirementClass) -> CoverageExpectation:
@@ -175,9 +183,9 @@ def _from_exposure(exposure: Exposure, feature: str, klass: RequirementClass) ->
         priority_weight=float(exposure.priority),
         requirement_class=klass,
         hard_constraint=klass == RequirementClass.MUST_HAVE,
-        source="advisor_priority" if klass != RequirementClass.BASELINE else "baseline",
+        source="advisor_priority" if klass in {RequirementClass.PREFERENCE, RequirementClass.MUST_HAVE} else ("exposure_hypothesis" if klass == RequirementClass.EXPOSURE else "baseline"),
         confidence=float(exposure.confidence),
-        client_asked=klass != RequirementClass.BASELINE,
+        client_asked=klass in {RequirementClass.PREFERENCE, RequirementClass.MUST_HAVE},
         assumption=exposure.status == FactKind.ASSUMPTION,
         accept_add_on=_expectation(text, klass) != CoverageExpectation.BASE,
         coverage_expectation=_expectation(text, klass),

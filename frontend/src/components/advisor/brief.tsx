@@ -118,6 +118,36 @@ export function RecommendationBrief({ view, runId }: { view: AdvisorView; runId:
         </ul>
       )}
       {rec.gaps.length > 0 && <p className="text-xs text-muted-foreground">{rec.gaps.slice(0, 3).join(" · ")}</p>}
+      {(rec.requirements?.length || 0) > 0 && (
+        <details className="rounded-md border border-hairline p-2">
+          <summary className="cursor-pointer text-xs text-ink">Client requirements</summary>
+          <ul className="mt-2 space-y-2">
+            {rec.requirements?.map((row) => (
+              <li key={row.feature} className="text-xs">
+                <div className="font-medium text-ink">{row.concept || row.label}</div>
+                {row.concept && row.label && row.label !== row.concept && <div className="text-muted-foreground">{row.label}</div>}
+                <div className="text-muted-foreground">Weight {Math.round((row.weight || 0) * 100)}%</div>
+                <ul className="mt-1 space-y-0.5 text-body">
+                  {row.results.map((cell) => (
+                    <li key={cell.policy_id}>{cell.policy_name}: {cell.label}</li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {(rec.alternatives?.length || 0) > 0 && (
+        <div className="space-y-1 text-xs">
+          <div className="text-muted-foreground">Alternative fit</div>
+          {rec.alternatives?.map((alt) => (
+            <p key={alt.policy_id}>
+              {alt.policy_name} · {alt.fit_score}/100
+              {alt.trade_offs[0] ? ` · ${alt.trade_offs[0]}` : ""}
+            </p>
+          ))}
+        </div>
+      )}
       {(view.why?.length || 0) > 0 && (
         <button type="button" className="focus-ring text-xs text-ink underline-offset-2 hover:underline" onClick={() => setWhy((v) => !v)}>
           {why ? "Hide why" : "Why?"}

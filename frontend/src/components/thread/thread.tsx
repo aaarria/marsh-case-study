@@ -15,7 +15,7 @@ import { RecommendationChange } from "@/components/advisor/recommendation-change
 import type { Deck } from "@/components/deck/use-deck";
 import { api } from "@/lib/api";
 import { fmtRelative, shortName } from "@/lib/format";
-import { intakeChips } from "@/lib/intake";
+import { intakeChips, storedCompanyName } from "@/lib/intake";
 import { NODE_EXPLAIN, NODE_LABELS } from "@/lib/pipeline";
 import { buildThread, type ThreadItem } from "@/lib/thread";
 import type { RunState, RunSummary } from "@/lib/types";
@@ -230,7 +230,10 @@ function AnsweredQuestion({ item, state, policyName }: { item: Extract<ThreadIte
   const a = item.answered!;
   const review = state.values.review;
   let answer: React.ReactNode = ANSWER_LABEL[a] ?? `Pitch ${shortName(policyName(a))}`;
-  if (item.question === "context" && a === "add_context") answer = <ChipRow items={intakeChips(state.values.intake)} className="justify-end" />;
+  if (item.question === "context" && a === "add_context") {
+    const chips = intakeChips(state.values?.intake);
+    answer = chips.length ? <ChipRow items={chips} className="justify-end" /> : ANSWER_LABEL[a];
+  }
   if (item.question === "review" && review?.action === a && (review.reviewer || review.note || review.feedback)) {
     answer = (
       <>
@@ -313,7 +316,9 @@ export function Thread({ state, deck, policyName, refresh }: { state: RunState; 
   const lastEventAt = state.events.length ? state.events[state.events.length - 1].created_at : null;
   const stalled = status === "running" && !!lastEventAt && now - toMs(lastEventAt) > STALL_MS;
   const q = state.question;
-  const intake = state.values.intake;
+  const intake = state.values?.intake ?? null;
+  const companyName = storedCompanyName(intake?.company_name, state.run?.company_name);
+  const pitchHeading = companyName ? `Pitch ${companyName}` : status === "running" ? "Loading" : intake ? "Unknown company" : "Company unavailable";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -325,9 +330,9 @@ export function Thread({ state, deck, policyName, refresh }: { state: RunState; 
           case "intake":
             return (
               <UserMessage key={i} meta={ts(item.at)}>
-                <div className="font-medium">Pitch {intake.company_name}</div>
-                <ChipRow items={intakeChips(intake)} className="mt-1 justify-end" />
-                {intake.advisor_notes && <div className="mt-1 text-xs text-muted-foreground">{intake.advisor_notes}</div>}
+                <div className="font-medium">{pitchHeading}</div>
+                {intake && <ChipRow items={intakeChips(intake)} className="mt-1 justify-end" />}
+                {intake?.advisor_notes && <div className="mt-1 text-xs text-muted-foreground">{intake.advisor_notes}</div>}
               </UserMessage>
             );
           case "step":

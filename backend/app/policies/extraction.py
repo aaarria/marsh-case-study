@@ -200,6 +200,15 @@ class HeuristicExtractor:
             hits = [k for k in strong_kw if k in t]
             # text-only hits must be unambiguous: the primary keyword, or two distinct keywords
             hit_text = (primary and primary in t) or len(hits) >= 2
+            if spec.key == "personal_accident" and "not applicable on accident" in t and "personal accident" not in t:
+                hit_text = False
+                hit_label = False
+            if spec.key == "teleconsultation_opd" and any(token in t for token in ("outpatient", "care opd", "wellbeing", "physical consultation")) and "e-consult" not in t and "teleconsult" not in t:
+                hit_text = False
+                hit_label = False
+            if spec.key == "opd" and any(token in t for token in ("e-consult", "teleconsult")) and "opd" not in t and "outpatient" not in t:
+                hit_text = False
+                hit_label = False
             if spec.key.startswith("waiting_period") and ch.content_type != ContentType.WAITING_PERIOD and "waiting" not in t:
                 hit_text = False
             if ch.content_type == ContentType.EXCLUSION and hit_text and ch.meta.get("list_item") and excl is None:
@@ -370,5 +379,7 @@ def get_policy_facts(policy_ids: list[str] | None = None) -> dict[str, PolicyExt
     else:
         selected = {pid: result for pid, result in extract_all_policies(policy_ids=ids).items() if pid in ids}
     from app.policies.normalize import apply_normalization
+    from app.policies.verify import verify_results
 
-    return apply_normalization(selected, lambda pid: retriever.store.list_chunks(pid))
+    normalized = apply_normalization(selected, lambda pid: retriever.store.list_chunks(pid))
+    return verify_results(normalized)

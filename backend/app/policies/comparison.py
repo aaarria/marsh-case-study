@@ -13,7 +13,7 @@ STATUS_LABEL = {
     CoverageStatus.CONDITIONAL: "Conditional",
     CoverageStatus.EXCLUDED: "Excluded",
     CoverageStatus.ADD_ON: "Add-on",
-    CoverageStatus.NOT_FOUND: "Not found",
+    CoverageStatus.NOT_FOUND: "Not specified in supplied brochure",
     CoverageStatus.UNKNOWN: "Unknown",
 }
 

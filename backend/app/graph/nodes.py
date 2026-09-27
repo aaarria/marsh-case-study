@@ -223,6 +223,10 @@ def policy_intelligence_node(state: AdvisoryState) -> dict:
     if not books:
         raise RuntimeError("No policy facts available. Run `python scripts/ingest_policies.py --extract` first.")
     canonical = canonicalize_results(books)
+    from app.services.llm import get_llm
+    from app.policies.verify import verify_with_model
+
+    canonical = verify_with_model(canonical, get_llm())
     return {"policy_facts": {pid: result.model_dump(mode="json") for pid, result in canonical.items()}, "warnings": warnings}
 
 

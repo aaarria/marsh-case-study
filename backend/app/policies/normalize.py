@@ -81,18 +81,61 @@ def apply_normalization(results: dict[str, PolicyExtractionResult], chunks_for) 
     for pid, result in results.items():
         chunks = list(chunks_for(pid) or [])
         facts = {key: fact.model_copy(deep=True) for key, fact in result.facts.items()}
+        _separate_opd_from_econsult(facts)
         for hit in _hits(chunks):
             if not _quote_ok(hit):
                 continue
             current = facts.get(hit.feature)
+            if current is not None and _needs_tier_context(current, hit):
+                facts[hit.feature] = hit.to_fact(pid)
+                continue
             if current is None or current.coverage_status in _MISSING or _MARKER not in (current.notes or ""):
                 if current is not None and current.coverage_status not in _MISSING and not _should_replace(current, hit, chunks):
                     current = _patch(current, hit)
                     facts[hit.feature] = current
                     continue
                 facts[hit.feature] = hit.to_fact(pid)
+        if "opd" not in facts:
+            facts["opd"] = FeatureFact(
+                policy_id=pid,
+                feature="opd",
+                coverage_status=CoverageStatus.NOT_FOUND,
+                notes=f"{_MARKER} OPD is not established from e-consultation or wellness wording.",
+            )
         out[pid] = result.model_copy(update={"facts": facts})
     return out
+
+
+def _separate_opd_from_econsult(facts: dict[str, FeatureFact]) -> None:
+    """A cached outpatient or wellbeing fact must not remain stored as e-consultation."""
+    fact = facts.get("teleconsultation_opd")
+    if fact is None or fact.coverage_status in _MISSING:
+        return
+    blob = f"{fact.value or ''} {fact.original_quote or ''}".lower()
+    econsult = any(token in blob for token in ("e-consult", "teleconsult", "e-opinion"))
+    outpatient = any(token in blob for token in ("outpatient", "care opd", "wellbeing", "physical consultation"))
+    if outpatient and not econsult:
+        facts["teleconsultation_opd"] = fact.model_copy(update={
+            "coverage_status": CoverageStatus.NOT_FOUND,
+            "value": None,
+            "limit": None,
+            "original_quote": None,
+            "is_add_on": False,
+            "add_on_required": False,
+            "sources": [],
+            "conditions": [],
+            "notes": f"{_MARKER} Outpatient evidence is OPD, not e-consultation.",
+        })
+
+
+def _needs_tier_context(current: FeatureFact, hit: _Hit) -> bool:
+    """Keep rider and optional status when an earlier extract stored only the benefit sentence."""
+    if hit.feature != "personal_accident" or current.coverage_status in _MISSING:
+        return False
+    blob = f"{current.value or ''} {current.original_quote or ''} {current.variant_scope or ''}".lower()
+    if hit.variant_scope and "optional" not in blob and "rider" not in blob:
+        return True
+    return "rider" in hit.quote.lower() and "rider" not in blob
 
 
 def _patch(fact: FeatureFact, hit: _Hit) -> FeatureFact:
@@ -118,6 +161,12 @@ def _should_replace(current: FeatureFact, hit: _Hit, chunks: list[Chunk]) -> boo
         blob = f"{current.value or ''} {current.original_quote or ''} {current.limit or ''}".lower()
         if "at actual" not in blob and "up to si" not in blob and "up to sum insured" not in blob and "up to your base sum insured" not in blob:
             return True
+    if hit.feature == "personal_accident":
+        blob = f"{current.value or ''} {current.original_quote or ''} {current.variant_scope or ''}".lower()
+        if hit.variant_scope and "optional" not in blob and "rider" not in blob:
+            return True
+        if "rider" in (hit.quote or "").lower() and "rider" not in blob:
+            return True
     if current.coverage_status == CoverageStatus.COVERED and hit.status in {CoverageStatus.ADD_ON, CoverageStatus.CONDITIONAL}:
         if hit.is_add_on or hit.variant_scope:
             return True
@@ -134,6 +183,24 @@ def _on_addon_page(fact: FeatureFact, chunks: list[Chunk]) -> bool:
 def _on_addon_page_hit(hit: _Hit, chunks: list[Chunk]) -> bool:
     pages = {chunk.page_number for chunk in hit.chunks}
     return any(chunk.page_number in pages and _addon_marker(chunk) for chunk in chunks)
+
+
+def _under_optional_heading(chunk: Chunk, chunks: list[Chunk]) -> bool:
+    """True when this row sits under an Optional Benefits heading in its own text or parent table."""
+    blob = f"{chunk.section or ''} {chunk.source_text}".lower()
+    if "optional benefit" in blob:
+        return True
+    parent = next((item for item in chunks if item.chunk_id == chunk.parent_chunk_id), None)
+    if parent is None:
+        return False
+    parent_text = parent.source_text.lower()
+    heading = parent_text.find("optional benefit")
+    if heading < 0:
+        return False
+    label = (chunk.meta.get("row_label") or chunk.source_text.split(":")[0]).strip().lower()
+    if not label:
+        return False
+    return parent_text.find(label, heading) > heading
 
 
 def _addon_marker(chunk: Chunk) -> bool:
@@ -255,15 +322,30 @@ def _hits(chunks: list[Chunk]) -> list[_Hit]:
                 variant_scope="plan variant" if variant else None, terminology="Global Cover", rank=rank + 1,
             ))
 
-        if "personal accident" in low and ("rider" in low or "optional" in low or on_addon or "1x" in low):
+        if "not applicable on accident" in low and "personal accident" not in low:
+            quote = _window(text, "not applicable on accident")
+            exception_rank = rank + (5 if chunk.content_type.value == "waiting_period" else 3)
+            keep(_Hit(
+                "accident_waiting_exception", CoverageStatus.CONDITIONAL, quote, quote, [chunk],
+                terminology="Accident waiting-period exception", rank=exception_rank,
+            ))
+        elif "personal accident" in low and ("rider" in low or "optional" in low or on_addon or "1x" in low):
             quote = _sentence(text, "personal accident")
-            keep(_Hit("personal_accident", CoverageStatus.ADD_ON, quote, quote, [chunk], is_add_on=True, terminology="Personal accident option", rank=rank + 1))
+            rider = "rider" in low
+            optional = _under_optional_heading(chunk, chunks)
+            keep(_Hit(
+                "personal_accident", CoverageStatus.ADD_ON, quote, quote, [chunk], is_add_on=True,
+                variant_scope="optional benefit" if optional and not rider else None,
+                terminology="Personal accident rider" if rider else "Personal accident optional benefit",
+                rank=rank + (3 if chunk.content_type.value == "add_on" else 1),
+            ))
 
         if "care opd" in low or ("optima wellbeing" in low and "outpatient" in low):
             quote = _sentence(text, "opd" if "opd" in low else "wellbeing")
-            keep(_Hit("teleconsultation_opd", CoverageStatus.ADD_ON, quote, quote, [chunk], is_add_on=True, terminology="OPD / wellbeing add-on", rank=rank))
-        if "e-consultation" in low and "unlimited" in low and not on_addon:
-            quote = _sentence(text, "e-consultation")
+            opd_rank = rank + (3 if chunk.content_type.value == "add_on" else 2)
+            keep(_Hit("opd", CoverageStatus.ADD_ON, quote, quote, [chunk], is_add_on=True, terminology="OPD add-on", rank=opd_rank))
+        if ("e-consultation" in low or "e-consultations" in low) and "unlimited" in low and "opd" not in low and not _under_optional_heading(chunk, chunks):
+            quote = _sentence(text, "e-consult")
             keep(_Hit("teleconsultation_opd", CoverageStatus.COVERED, quote, quote, [chunk], terminology="Unlimited e-consultation", rank=rank + 1))
 
         if "healthreturns" in low and ("steps" in low or "earn" in low):

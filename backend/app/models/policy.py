@@ -175,6 +175,8 @@ class FeatureFact(BaseModel):
     is_add_on: bool = False
     add_on_required: bool = False
     variant_scope: str | None = None  # e.g. "VIP+ only"
+    coverage_tier: str | None = None  # BASE | CONDITIONAL | OPTIONAL | ADD_ON | RIDER | EXCLUDED | NOT_ESTABLISHED | REVIEW_REQUIRED
+    cap_type: str | None = None
     original_quote: str | None = None
     source_page: int | None = None
     source_section: str | None = None

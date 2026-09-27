@@ -29,6 +29,7 @@ from __future__ import annotations
 import math
 
 from app.models.fit import (
+    AlternativeFit,
     ClientRequirement,
     CriterionScore,
     DecisionState,
@@ -280,7 +281,7 @@ def _apply_comparison_sufficiency(fits: list[PolicyFitResult]) -> None:
         ]
         fit.explicit_exclusions = [row.feature for row in fit.contributions if row.explicit_exclusion]
         fit.eligible = not fit.must_have_gaps
-        client_rows = [row for row in fit.contributions if row.requirement_class != "BASELINE"]
+        client_rows = [row for row in fit.contributions if row.requirement_class in {"PREFERENCE", "MUST_HAVE"}]
         fit.client_requirements_resolved = all(
             row.criterion_score is not None and not row.unresolved and not row.comparison_incomplete for row in client_rows
         )
@@ -402,19 +403,57 @@ def _fact_from_outcome(outcome: ScenarioOutcome, feature: str) -> FeatureFact:
     )
 
 
+def alternative_fits(fits: list[PolicyFitResult], docs: dict, primary_id: str = "", limit: int = 2) -> list[AlternativeFit]:
+    """Decision-sufficient peers only, ordered by fit then criterion scores. Incomplete policies are omitted."""
+    peers = [fit for fit in fits if fit.decision_sufficient and fit.eligible and fit.policy_id != primary_id]
+    # Evidence text breaks an exact score tie for display. Policy id is not a ranking input.
+    peers.sort(key=lambda fit: (
+        -fit.score,
+        tuple((row.feature, -1 if row.criterion_score is None else row.criterion_score) for row in sorted(fit.contributions, key=lambda row: row.feature)),
+        tuple((row.feature, row.evidence or "") for row in sorted(fit.contributions, key=lambda row: row.feature)),
+    ))
+    found: list[AlternativeFit] = []
+    for fit in peers[:limit]:
+        client = [row for row in fit.contributions if row.requirement_class in {"PREFERENCE", "MUST_HAVE"}]
+        ranked = sorted((row for row in client if row.criterion_score is not None), key=lambda row: -row.criterion_score)
+        strong = [f"{row.description}: {row.criterion_score:.0f}" for row in ranked[:2]]
+        trade_offs = []
+        for row in client:
+            if row.criterion_score is None:
+                trade_offs.append(f"{row.description}: not specified in the supplied brochure.")
+            elif row.status in {"ADD_ON", "CONDITIONAL", "EXCLUDED"} or row.criterion_score < 70:
+                trade_offs.append(f"{row.description}: {row.status} {row.criterion_score:.0f}")
+        evidence = []
+        for row in ranked[:2]:
+            if row.evidence:
+                page = f" p.{row.source_page}" if row.source_page else ""
+                evidence.append(f"{row.feature}{page}: {row.evidence[:180]}")
+        doc = docs.get(fit.policy_id)
+        found.append(AlternativeFit(
+            policy_id=fit.policy_id,
+            policy_name=doc.policy_name if doc else fit.policy_id,
+            fit_score=fit.score,
+            evidence_completeness=fit.evidence_completeness,
+            decision_state=fit.decision_state,
+            strong_matches=strong,
+            trade_offs=trade_offs[:3],
+            evidence=evidence,
+        ))
+    return found
+
+
 def _named(chosen, fits, gaps, docs, assumptions, state: DecisionState, competing: list[str]) -> Recommendation:
     doc = docs.get(chosen.policy_id)
     name = doc.policy_name if doc else chosen.policy_id
-    others = [f for f in fits if f.policy_id != chosen.policy_id]
-    runner = others[0] if others else None
+    options = alternative_fits(fits, docs, chosen.policy_id)
+    runner = options[0] if options else None
     if state == DecisionState.ADVISOR_OVERRIDE:
         lead = f"Advisor override. {name} is pitched at fit {chosen.score}/100."
     else:
         lead = f"Highest fit among decision-sufficient policies ({chosen.score}/100). Evidence completeness is a separate gate and is not added to fit."
     rationale = [lead] + chosen.explanation[:4]
     if runner:
-        runner_name = docs[runner.policy_id].policy_name if runner.policy_id in docs else runner.policy_id
-        rationale.append(f"Next: {runner_name} at {runner.score}/100.")
+        rationale.append(f"Alternative: {runner.policy_name} at {runner.fit_score}/100.")
     caveats = list(dict.fromkeys(g.detail for g in gaps if g.policy_id == chosen.policy_id and g.severity in {"HIGH", "MEDIUM"}))[:5]
     caveats.extend(f"Must-have gap: {feature}." for feature in chosen.must_have_gaps)
     if chosen.confidence == "LOW":
@@ -435,6 +474,7 @@ def _named(chosen, fits, gaps, docs, assumptions, state: DecisionState, competin
         competing_policy_ids=competing,
         comparison_incomplete=list(chosen.comparison_incomplete),
         unresolved_must_haves=list(chosen.unresolved_must_haves),
+        alternatives=options,
     )
 
 
@@ -456,4 +496,5 @@ def _unresolved(top, peers, docs, gaps, assumptions, state: DecisionState, reaso
         competing_policy_ids=[f.policy_id for f in peers],
         comparison_incomplete=list(dict.fromkeys(feature for fit in peers for feature in fit.comparison_incomplete)),
         unresolved_must_haves=list(dict.fromkeys(feature for fit in peers for feature in fit.unresolved_must_haves)),
+        alternatives=alternative_fits(peers, docs, ""),
     )

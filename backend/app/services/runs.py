@@ -167,6 +167,14 @@ def answer_run(run_id: str, answer: dict[str, Any], background: bool = True) -> 
         _execute(run_id, payload)
 
 
+def delete_run(run_id: str) -> None:
+    """Drop a finished pitch. Refuses while its worker thread is still writing."""
+    if _is_executing(run_id):
+        raise RunStateError("This pitch is still generating")
+    if not store().delete_run(run_id):
+        raise RunNotFound(run_id)
+
+
 def _is_executing(run_id: str) -> bool:
     t = _threads.get(run_id)
     return bool(t and t.is_alive())

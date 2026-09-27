@@ -16,9 +16,9 @@ _STATUS = {
     "CONDITIONAL": "Conditional",
     "ADD_ON": "Optional add-on",
     "EXCLUDED": "Excluded",
-    "NOT_FOUND": "Not established",
-    "UNKNOWN": "Not established",
-    "REVIEW_REQUIRED": "Not established",
+    "NOT_FOUND": "Not specified in supplied brochure",
+    "UNKNOWN": "Not specified in supplied brochure",
+    "REVIEW_REQUIRED": "Needs review",
 }
 
 _DECISION = {
@@ -60,6 +60,7 @@ _ROWS = (
     "sum_insured_growth_bonus",
     "health_checkup",
     "teleconsultation_opd",
+    "opd",
 )
 
 _RECOMMENDATION_WORDING = "Recommended based on the configured client requirements and documented policy evidence."
@@ -220,8 +221,23 @@ def _recommendation(values: dict[str, Any], docs: dict[str, Any]) -> dict[str, A
                 "evidence_completeness": row.get("evidence_completeness"),
                 "confidence": row.get("confidence"),
                 "decision_label": _DECISION.get(row.get("decision_state") or "", row.get("decision_state") or ""),
+                "decision_sufficient": row.get("decision_sufficient"),
             }
             for row in fits
+        ],
+        "requirements": _requirement_breakdown(fits, docs),
+        "alternatives": [
+            {
+                "policy_id": item.get("policy_id"),
+                "policy_name": item.get("policy_name") or _name(docs, item.get("policy_id")),
+                "fit_score": item.get("fit_score"),
+                "evidence_completeness": item.get("evidence_completeness"),
+                "decision_state": item.get("decision_state"),
+                "strong_matches": list(item.get("strong_matches") or []),
+                "trade_offs": list(item.get("trade_offs") or []),
+                "evidence": list(item.get("evidence") or []),
+            }
+            for item in (rec.get("alternatives") or [])
         ],
     }
 
@@ -290,6 +306,35 @@ def _comparison(values: dict[str, Any], docs: dict[str, Any]) -> dict[str, Any] 
         "policies": [{"policy_id": pid, "policy_name": _name(docs, pid), "insurer": _insurer(docs, pid)} for pid in order],
         "rows": rows,
     }
+
+
+def _requirement_breakdown(fits: list[dict[str, Any]], docs: dict[str, Any]) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for fit in fits:
+        for row in fit.get("contributions") or []:
+            if row.get("requirement_class") not in {"PREFERENCE", "MUST_HAVE"}:
+                continue
+            feature = row.get("feature") or ""
+            if feature not in grouped:
+                grouped[feature] = {
+                    "feature": feature,
+                    "label": row.get("description") or FEATURE_LABELS.get(feature, feature),
+                    "concept": FEATURE_LABELS.get(feature, feature),
+                    "weight": row.get("weight"),
+                    "results": [],
+                }
+                order.append(feature)
+            score = row.get("criterion_score")
+            status = str(row.get("status") or "NOT_FOUND")
+            grouped[feature]["results"].append({
+                "policy_id": fit.get("policy_id"),
+                "policy_name": _name(docs, fit.get("policy_id")),
+                "criterion_score": score,
+                "status": status,
+                "label": _STATUS.get(status, status) if score is None else f"{_STATUS.get(status, status)} {score:g}",
+            })
+    return [grouped[feature] for feature in order]
 
 
 def _policy_check(values: dict[str, Any], docs: dict[str, Any]) -> dict[str, Any] | None:

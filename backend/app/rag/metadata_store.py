@@ -215,6 +215,16 @@ class SQLiteMetadataStore:
             )
         return out
 
+    def delete_run(self, run_id: str) -> bool:
+        with self._conn() as c:
+            row = c.execute("SELECT 1 FROM runs WHERE run_id=?", (run_id,)).fetchone()
+            if row is None:
+                return False
+            c.execute("DELETE FROM artifacts WHERE run_id=?", (run_id,))
+            c.execute("DELETE FROM run_events WHERE run_id=?", (run_id,))
+            c.execute("DELETE FROM runs WHERE run_id=?", (run_id,))
+        return True
+
     def run_ids_with_status(self, status: str) -> list[str]:
         with self._conn() as c:
             rows = c.execute("SELECT run_id FROM runs WHERE status=?", (status,)).fetchall()

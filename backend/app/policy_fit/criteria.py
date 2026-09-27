@@ -41,6 +41,8 @@ FEATURE_TYPE = {
     "pricing_zones": CriterionType.GEOGRAPHIC,
     "health_checkup": CriterionType.WELLNESS,
     "teleconsultation_opd": CriterionType.WELLNESS,
+    "opd": CriterionType.WELLNESS,
+    "accident_waiting_exception": CriterionType.WAITING_PERIOD,
     "wellness_renewal_discount": CriterionType.WELLNESS,
 }
 

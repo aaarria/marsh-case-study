@@ -49,7 +49,7 @@ def test_advisor_view_does_not_invent_a_winner_or_a_quote():
     labels = {cell["policy_id"]: cell["status_label"] for cell in view["comparison"]["rows"][0]["cells"]}
     assert labels == {"p2": "Excluded", "p1": "Not established"}
     missing = lookup_evidence(values, "p1", "maternity")
-    assert missing["quote"] is None and missing["status_label"] == "Not established"
+    assert missing["quote"] is None and missing["status_label"] == "Not specified in supplied brochure"
     found = lookup_evidence(values, "p2", "maternity")
     assert found["quote"] == "Maternity is not covered."
     assert view["policy_check"]["stability"] == "INCOMPLETE"
@@ -94,6 +94,40 @@ def test_canvas_and_pptx_share_slide_wording(tmp_path):
             assert body[:40] in rendered or label in rendered
     ts = (ROOT / "frontend/src/lib/slide-text.ts").read_text()
     assert "assumption:" in ts and "why this policy:" in ts and "watch-out:" in ts
+
+
+def test_pitch_fit_score_uses_the_calculated_score_not_a_model_number():
+    """A model that writes 87.1 when the engine scored 67.1 must not leave that figure in the deck."""
+    from app.pitch.generator import BulletOut, SlideOut
+
+    profile = CompanyProfile(company_name="POPXO", industry="Media", overview="POPXO is a digital media company.")
+    exposures = [Exposure(exposure_id="e1", title="Hospitalisation", description="Employees need in-patient cover.", basis=[], reasoning="Baseline", status=FactKind.ASSUMPTION, feature_keys=["in_patient_hospitalisation"], priority=1)]
+    rec = Recommendation(recommended_policy_id="p1", policy_name="HDFC ERGO Optima Secure+", fit_score=67.1, rationale=["Room rent is at actuals."], decision_state="eligible")
+    item = EvidenceItem(evidence_id="E1", policy_id="p1", policy_name="HDFC ERGO Optima Secure+", feature_key="room_rent", feature_label="Room rent", status=CoverageStatus.COVERED, statement="Room rent is at actuals.", sources=[SourceRef(policy_id="p1", policy_name="HDFC ERGO Optima Secure+", chunk_id="c1", page=2, section="Room", source_text="Room Rent: At actuals.")])
+    pack = EvidencePack(recommended_policy_id="p1", items=[item])
+
+    class _Writer:
+        available = True
+
+        def structured(self, system, user, schema, purpose="", temperature=0.2):
+            return schema(slides=[
+                SlideOut(title="POPXO at a glance", bullets=[BulletOut(text="INDUSTRY|Digital media", kind="assumption")]),
+                SlideOut(title="From exposure to benefit", bullets=[BulletOut(text="Room rent|Room rent is at actuals.", kind="policy", evidence_ids=["E1"])]),
+                SlideOut(title="Why Marsh", bullets=[BulletOut(text="PERSPECTIVE|See the client's risks from more than one angle.", kind="marsh")]),
+                SlideOut(title="One policy. Clear rationale.", subtitle="HDFC ERGO Optima Secure+", bullets=[
+                    BulletOut(text="Recommended Policy: HDFC ERGO Optima Secure+ with a decision-support fit score of 87.1/100", kind="policy", evidence_ids=["E1"]),
+                    BulletOut(text="SCORE|87.1/100", kind="recommendation"),
+                ]),
+            ])
+
+    pitch, warnings = generate_pitch(profile, exposures, rec, pack, llm=_Writer())
+    blob = " ".join(b.text for s in pitch.slides for b in s.bullets)
+    assert "87.1" not in blob
+    assert "67.1" in blob
+    score_bullets = [b for s in pitch.slides for b in s.bullets if "67.1" in b.text]
+    assert score_bullets
+    assert all(b.kind == "recommendation" and not b.source_chunk_ids for b in score_bullets)
+    assert any("calculated recommendation score" in line or "not brochure evidence" in line for line in warnings)
 
 
 def test_upload_stays_out_of_the_policy_corpus(retriever):

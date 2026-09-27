@@ -2,21 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowUp, ChevronDown } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { Matrix } from "@/components/matrix";
 import { Button } from "@/components/ui/button";
 import { Chip, ChipGroup } from "@/components/chip";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { ErrorBlock } from "@/components/states";
 import { SystemNotice } from "@/components/system-notice";
 import { api, ApiError } from "@/lib/api";
 import { useHealth } from "@/lib/use-health";
 import { PRIORITY_SUGGESTIONS } from "@/lib/intake";
 import type { PolicyDocument, PolicyUploadStatus } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const MIN_POLICIES = 2;
 
@@ -27,9 +23,7 @@ export default function Composer() {
   const [policies, setPolicies] = useState<PolicyDocument[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [company, setCompany] = useState("");
-  const [ctx, setCtx] = useState({ industry: "", geography: "", employee_count: "", advisor_notes: "" });
   const [priorities, setPriorities] = useState<string[]>([]);
-  const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [uploads, setUploads] = useState<PolicyUploadStatus[]>([]);
@@ -48,22 +42,15 @@ export default function Composer() {
 
   const name = company.trim();
   const tooFew = policies.length > 0 && selected.length < MIN_POLICIES;
-  const ctxCount = Object.values(ctx).filter((x) => x.trim()).length + (priorities.length ? 1 : 0);
   const canSend = name.length >= 2 && policies.length > 0 && !tooFew && !submitting && !readiness.indexBuilding;
 
   const send = async () => {
     if (!canSend) return;
-    const count = ctx.employee_count ? Number(ctx.employee_count) : undefined;
-    if (count !== undefined && (!Number.isInteger(count) || count < 1)) return setError("Employee count must be a positive whole number.");
     setSubmitting(true);
     setError(null);
     try {
       const res = await api.analyze({
         company_name: name,
-        industry: ctx.industry.trim() || null,
-        geography: ctx.geography.trim() || null,
-        employee_count: count ?? null,
-        advisor_notes: ctx.advisor_notes.trim() || null,
         client_priorities: priorities,
         selected_policy_ids: selected.length === policies.length ? null : selected,
       });
@@ -84,7 +71,7 @@ export default function Composer() {
             {/* The system's mark: the same dot matrix as the status bar, at hero scale. It twinkles while the run is being started and otherwise holds still. */}
             <Matrix variant="twinkle" state={submitting ? "working" : "done"} dot={6} rounded className="mx-auto mb-8" title={submitting ? "Starting the run" : "Ready"} />
             <h1 className="display text-3xl sm:text-4xl">Who are we pitching?</h1>
-            <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">Name the client and send. The thread compares the brochures, drafts a short deck, audits every claim, and asks you only when a decision is genuinely yours.</p>
+            <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">AI researches the company. Policy coverage is grounded in the supplied brochures. Unknowns remain unknown.</p>
           </div>
 
           <form
@@ -124,35 +111,7 @@ export default function Composer() {
                   </Chip>
                 ))}
               </ChipGroup>
-            </div>
-
-            <div className="border-t border-hairline">
-              <button type="button" onClick={() => setMore(!more)} aria-expanded={more} className="focus-ring flex w-full items-center justify-between px-3 py-2 text-sm text-body hover:text-ink">
-                <span>
-                  What you already know <span className="text-muted-foreground">({readiness.researchOff ? "recommended: web research is off" : "optional"}{ctxCount ? ` · ${ctxCount} filled` : ""})</span>
-                </span>
-                <ChevronDown className={cn("size-4 text-muted-foreground transition-transform duration-(--dur-base)", more && "rotate-180")} />
-              </button>
-              {more && (
-                <div className="grid gap-3 px-3 pb-3 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="industry">Industry</Label>
-                    <Input id="industry" value={ctx.industry} maxLength={120} onChange={(e) => setCtx({ ...ctx, industry: e.target.value })} placeholder="e.g. IT services" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="geo">Geography</Label>
-                    <Input id="geo" value={ctx.geography} maxLength={120} onChange={(e) => setCtx({ ...ctx, geography: e.target.value })} placeholder="e.g. Pan-India" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="count">Employees</Label>
-                    <Input id="count" type="number" min={1} max={5_000_000} value={ctx.employee_count} onChange={(e) => setCtx({ ...ctx, employee_count: e.target.value })} placeholder="e.g. 5000" />
-                  </div>
-                  <div className="space-y-1 sm:col-span-3">
-                    <Label htmlFor="notes">Advisor notes</Label>
-                    <Textarea id="notes" rows={2} maxLength={2000} value={ctx.advisor_notes} onChange={(e) => setCtx({ ...ctx, advisor_notes: e.target.value })} placeholder="Workforce profile, current insurer pain points, budget signals, renewal timing…" />
-                  </div>
-                </div>
-              )}
+              <p className="mt-1.5 text-2xs text-quiet">Selected priorities directly shape policy fit.</p>
             </div>
 
             <div className="border-t border-hairline px-3 py-2">

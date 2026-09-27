@@ -6,6 +6,7 @@ template pitch is produced when no LLM is configured, so the pipeline never fabr
 """
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -118,7 +119,7 @@ def template_pitch(profile: CompanyProfile, exposures: list[Exposure], recommend
         tag = "GAP" if any(w in low for w in ("does not address", "cannot be confirmed", "not found", "unknown")) else "LIMIT" if any(w in low for w in ("capped", "limit")) else "CONDITION" if "condition" in low or "subject to" in low else "WATCH"
         s3.bullets.append(SlideBullet(text=f"{tag}|{_clip(g, 90)}", kind="recommendation"))
 
-    score = int(round(recommendation.fit_score))
+    score = f"{recommendation.fit_score:.1f}"
     s4 = Slide(slide_number=4, title="One policy. Clear rationale.", subtitle=name, layout="recommendation", bullets=[])
     s4.bullets.append(SlideBullet(text=f"SCORE|{score}/100", kind="recommendation"))
     for reason in recommendation.rationale[:3]:
@@ -127,7 +128,9 @@ def template_pitch(profile: CompanyProfile, exposures: list[Exposure], recommend
         s4.bullets.append(SlideBullet(text=f"REASON|{it.feature_label}: {_clip(it.statement, 80)}", source_chunk_ids=it.chunk_ids[:1], policy_id=pid, kind="policy"))
     trade = next((a for a in pack.assumptions), None) or (pack.gaps[0] if pack.gaps else "Group terms are not in these brochures. Confirm wording before a client meeting.")
     s4.bullets.append(SlideBullet(text=f"TRADEOFF|{_clip(trade, 120)}", kind="assumption"))
-    return _finalise([s1, s2, s3, s4], profile.company_name, pid, version)
+    pitch = _finalise([s1, s2, s3, s4], profile.company_name, pid, version)
+    align_fit_score(pitch.slides, recommendation.fit_score)
+    return pitch
 
 
 def generate_pitch(profile: CompanyProfile, exposures: list[Exposure], recommendation: Recommendation, pack: EvidencePack, llm: LLMService | None = None, version: int = 1, feedback: str | None = None) -> tuple[Pitch, list[str]]:
@@ -189,4 +192,39 @@ def generate_pitch(profile: CompanyProfile, exposures: list[Exposure], recommend
     slides = slides[:4]
     for slide, layout in zip(slides, ("glance", "map", "perspective", "recommendation")):
         slide.layout = layout
+    warnings.extend(align_fit_score(slides, recommendation.fit_score))
     return _finalise(slides, profile.company_name, pack.recommended_policy_id, version), warnings
+
+
+_FIT_CLAUSE = re.compile(r"(?i)(?:,|\s)?(?:with a )?(?:decision-support )?fit score of \d+(?:\.\d+)?\s*/\s*100")
+_FIT_NUMBER = re.compile(r"\d+(?:\.\d+)?(?=\s*/\s*100)")
+
+
+def align_fit_score(slides: list[Slide], score: float) -> list[str]:
+    """The fit figure in a pitch is the calculated score. It is not a brochure number.
+
+    A policy bullet cannot carry it, because the audit would look for that figure in the brochure
+    and fail when the model wrote a different number.
+    """
+    canon = f"{score:.1f}"
+    warnings: list[str] = []
+    for slide in slides:
+        kept: list[SlideBullet] = []
+        for bullet in slide.bullets:
+            if bullet.kind == "policy" and _FIT_CLAUSE.search(bullet.text):
+                bullet.text = _FIT_CLAUSE.sub("", bullet.text).strip(" ,;.")
+                warnings.append("Removed a fit score from a policy bullet. The score is not brochure evidence.")
+                if not bullet.text:
+                    continue
+            elif re.search(r"fit score|SCORE\|", bullet.text, re.I):
+                updated = _FIT_NUMBER.sub(canon, bullet.text, count=1)
+                if updated != bullet.text:
+                    warnings.append("Replaced a pitch fit score with the calculated recommendation score.")
+                bullet.text = updated
+                bullet.kind = "recommendation"
+                bullet.source_chunk_ids = []
+                bullet.source_urls = []
+                bullet.policy_id = None
+            kept.append(bullet)
+        slide.bullets = kept
+    return warnings

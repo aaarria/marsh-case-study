@@ -51,17 +51,18 @@ def _baseline(profile: CompanyProfile, intake: ClientIntake) -> list[Exposure]:
     """Deterministic exposures every employer health programme must address."""
     base = [
         Exposure(exposure_id=stable_id(profile.company_name, "hosp"), title="Employee hospitalisation", description="Employees and dependents need in-patient cover with restore of the sum insured after a large claim.",
-                 basis=[], reasoning="Core purpose of any employee medical cover.", status=FactKind.FACT, confidence=0.95, priority=1.2, feature_keys=["in_patient_hospitalisation", "room_rent", "restore_recharge"]),
+                 basis=["baseline_programme"], reasoning="Core purpose of any employee medical cover.", status=FactKind.FACT, confidence=0.95, priority=1.2, feature_keys=["in_patient_hospitalisation", "room_rent", "restore_recharge"]),
         Exposure(exposure_id=stable_id(profile.company_name, "wait"), title="Waiting periods for new joiners", description="New employees with pre-existing conditions face waiting periods before cover applies.",
-                 basis=[], reasoning="Standard retail policies apply initial, specific-illness and PED waiting periods.", status=FactKind.INFERENCE, confidence=0.8, priority=1.0, feature_keys=["waiting_period_initial", "waiting_period_ped", "chronic_conditions_day1"]),
+                 basis=["baseline_programme"], reasoning="Standard retail policies apply initial, specific-illness and PED waiting periods.", status=FactKind.INFERENCE, confidence=0.8, priority=1.0, feature_keys=["waiting_period_initial", "waiting_period_ped", "chronic_conditions_day1"]),
         Exposure(exposure_id=stable_id(profile.company_name, "oop"), title="Out-of-pocket leakage", description="Consumables, room-rent caps and co-payments create out-of-pocket costs for employees.",
-                 basis=[], reasoning="Common driver of employee dissatisfaction with health cover.", status=FactKind.INFERENCE, confidence=0.75, priority=1.0, feature_keys=["non_medical_expenses_cover", "copay", "room_rent"]),
+                 basis=["baseline_programme"], reasoning="Common driver of employee dissatisfaction with health cover.", status=FactKind.INFERENCE, confidence=0.75, priority=1.0, feature_keys=["non_medical_expenses_cover", "copay", "room_rent"]),
     ]
     for p in intake.client_priorities:
         keys = map_text_to_features(p, limit=3)
         if keys:
+            share = 1.8 / len(keys)
             base.append(Exposure(exposure_id=stable_id(profile.company_name, "prio", p), title=f"Advisor priority: {p}", description=f"The advisor flagged '{p}' as a client priority.",
-                                 basis=["advisor_priority"], reasoning="Stated client priority from the advisor intake.", status=FactKind.FACT, confidence=0.9, priority=1.8, feature_keys=keys))
+                                 basis=["advisor_priority"], reasoning="Stated client priority from the advisor intake.", status=FactKind.FACT, confidence=0.9, priority=share, feature_keys=keys))
     return base
 
 

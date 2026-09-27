@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Matrix } from "@/components/matrix";
 import { api } from "@/lib/api";
 import { fmtRelative, runStatus } from "@/lib/format";
@@ -18,10 +19,24 @@ import { cn } from "@/lib/utils";
  * says which Gemini model is doing the work, whether web research is on, and what is indexed.
  */
 export function AppShell({ children, runId, refreshKey }: { children: React.ReactNode; runId?: string | null; refreshKey?: string | null }) {
+  const router = useRouter();
   const [recent, setRecent] = useState<RunSummary[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   useEffect(() => {
     api.runs(30).then((r) => setRecent(r.runs)).catch(() => {});
   }, [runId, refreshKey]);
+  async function removePitch(id: string) {
+    setDeleteError(null);
+    try {
+      await api.deleteRun(id);
+      setRecent((rows) => rows.filter((row) => row.run_id !== id));
+      setPendingDelete(null);
+      if (id === runId) router.push("/");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Could not delete this pitch.");
+    }
+  }
   const r = useHealth();
   const h = r.health;
   const working = refreshKey === "running";
@@ -41,6 +56,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
         </div>
         <nav className="thin-scroll flex-1 overflow-y-auto px-2 pb-3" aria-label="Pitches">
           <div className="kicker px-2 pb-1 pt-2 text-marsh-navy/55">Pitches</div>
+          {deleteError && <p className="px-2 pb-1 text-2xs text-marsh-navy">{deleteError}</p>}
           {recent.length === 0 ? (
             <p className="px-2 py-1 text-xs text-marsh-navy/55">Nothing yet.</p>
           ) : (
@@ -48,13 +64,23 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
               {recent.map((r) => {
                 const rs = runStatus(r);
                 const on = r.run_id === runId;
+                const confirming = pendingDelete === r.run_id;
                 return (
-                  <li key={r.run_id}>
-                    <Link href={`/runs/${r.run_id}`} aria-current={on ? "page" : undefined} title={`${r.company_name} · ${rs.label}`} className={cn("focus-ring flex h-8 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-(--dur-fast)", on ? "bg-marsh-navy text-marsh-white" : "text-marsh-navy hover:bg-marsh-navy/10")}>
+                  <li key={r.run_id} className="group flex items-center gap-0.5">
+                    <Link href={`/runs/${r.run_id}`} aria-current={on ? "page" : undefined} title={`${r.company_name} · ${rs.label}`} className={cn("focus-ring flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-(--dur-fast)", on ? "bg-marsh-navy text-marsh-white" : "text-marsh-navy hover:bg-marsh-navy/10")}>
                       <span className={cn(`tone-${rs.tone} tint-dot size-1.5 shrink-0 rounded-full`)} aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{r.company_name}</span>
                       <span className={cn("shrink-0 text-2xs tabular-nums", on ? "text-marsh-white/70" : "text-marsh-navy/50")}>{r.status === "awaiting_review" ? "needs you" : fmtRelative(r.updated_at)}</span>
                     </Link>
+                    <button
+                      type="button"
+                      aria-label={confirming ? `Confirm delete ${r.company_name}` : `Delete ${r.company_name}`}
+                      title={confirming ? "Click again to delete" : "Delete pitch"}
+                      className={cn("focus-ring grid size-7 shrink-0 place-items-center rounded-md", on ? "text-marsh-white/80 hover:bg-marsh-white/10" : "text-marsh-navy/40 hover:bg-marsh-navy/10 hover:text-marsh-navy")}
+                      onClick={() => (confirming ? removePitch(r.run_id) : setPendingDelete(r.run_id))}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
                   </li>
                 );
               })}

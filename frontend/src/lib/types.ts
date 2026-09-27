@@ -234,7 +234,8 @@ export interface Intake {
 
 interface RunValues {
   run_id: string;
-  intake: Intake;
+  /** Absent until the graph checkpoint is written, and on runs interrupted before the first checkpoint. */
+  intake?: Intake | null;
   policy_ids?: string[];
   profile?: CompanyProfile;
   exposures?: Exposure[];
@@ -306,7 +307,9 @@ export interface AdvisorView {
     drivers: string[];
     gaps: string[];
     changed_after_check: boolean;
-    scores: { policy_id: string; policy_name?: string | null; fit_score?: number | null; evidence_completeness?: number | null; confidence?: string | null; decision_label: string }[];
+    scores: { policy_id: string; policy_name?: string | null; fit_score?: number | null; evidence_completeness?: number | null; confidence?: string | null; decision_label: string; decision_sufficient?: boolean }[];
+    requirements?: { feature: string; label: string; concept?: string | null; weight?: number | null; results: { policy_id?: string | null; policy_name?: string | null; criterion_score?: number | null; status: string; label: string }[] }[];
+    alternatives?: { policy_id?: string | null; policy_name?: string | null; fit_score?: number | null; evidence_completeness?: number | null; decision_state?: string | null; strong_matches: string[]; trade_offs: string[]; evidence: string[] }[];
   } | null;
   why?: { requirement: string; feature?: string | null; priority: string; result: string; page?: number | null; policy_name?: string | null; impact: string; contribution?: number | null; weight?: number | null; chunk_id?: string | null }[];
   comparison?: {
@@ -374,6 +377,10 @@ export interface RecommendationChangeResult {
   recommendation?: { recommended_policy_id?: string | null; decision_state?: string | null; fit_score?: number | null; policy_name?: string | null };
   scores?: { policy_id: string; policy_name?: string | null; fit_score?: number | null; decision_state?: string | null }[];
   gaps?: string[];
+  interpreted_change?: string[];
+  old_weights?: { feature: string; weight: number }[];
+  new_weights?: { feature: string; weight: number }[];
+  alternatives?: { policy_name?: string | null; fit_score?: number | null; decision_state?: string | null }[];
 }
 
 export interface PolicyUploadStatus {

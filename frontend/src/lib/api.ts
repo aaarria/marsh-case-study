@@ -40,6 +40,7 @@ export const api = {
   policyUploads: () => request<{ uploads: PolicyUploadStatus[]; corpus: { policy_id: string; policy_name: string; status: string; in_comparison: boolean }[] }>("/api/policies/uploads"),
   analyze: (body: Record<string, unknown>) => request<{ run_id: string; status: string }>("/api/client/analyze", { method: "POST", body: JSON.stringify(body) }),
   runs: (limit = 20) => request<{ runs: RunSummary[] }>(`/api/runs?limit=${limit}`),
+  deleteRun: (runId: string) => request<{ run_id: string; deleted: boolean }>(`/api/runs/${runId}`, { method: "DELETE" }),
   run: (runId: string) => request<RunState>(`/api/runs/${runId}`),
   retryRun: (runId: string) => request<{ run_id: string; status: string }>(`/api/runs/${runId}/retry`, { method: "POST" }),
   artifact: <T,>(runId: string, kind: string) => request<T>(`/api/runs/${runId}/artifacts/${kind}`),

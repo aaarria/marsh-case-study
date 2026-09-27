@@ -52,8 +52,12 @@ FEATURES: list[FeatureSpec] = [
     FeatureSpec("hospital_daily_cash", "Hospital daily cash", "optional", ("hospital cash per day benefit optional",), ("hospital cash", "hospi cash")),
     FeatureSpec("health_checkup", "Preventive health check-up", "wellness",
                 ("preventive annual health check-up limit",), ("health check-up", "health checkup", "preventive")),
-    FeatureSpec("teleconsultation_opd", "Teleconsultation / OPD", "wellness",
-                ("e-consultation teleconsultation OPD outpatient consultations",), ("e-consultation", "OPD", "outpatient", "e-opinion", "consultation")),
+    FeatureSpec("teleconsultation_opd", "E-consultation", "wellness",
+                ("e-consultation teleconsultation within the insurer network",), ("e-consultation", "teleconsultation", "e-opinion")),
+    FeatureSpec("opd", "OPD", "wellness",
+                ("outpatient OPD physical consultation benefit limits",), ("OPD", "outpatient", "physical consultation")),
+    FeatureSpec("accident_waiting_exception", "Accident waiting-period exception", "terms",
+                ("initial waiting period not applicable on accident cases",), ("not applicable on accident", "accident cases")),
     FeatureSpec("wellness_renewal_discount", "Wellness renewal discount", "wellness",
                 ("wellness program renewal discount healthy days steps",), ("renewal discount", "wellness", "steps", "live healthy", "HealthReturns")),
     FeatureSpec("maternity", "Maternity cover", "core",
@@ -89,7 +93,7 @@ FEATURE_LABELS: dict[str, str] = {f.key: f.label for f in FEATURES}
 DEFAULT_MATRIX_FEATURES: list[str] = [
     "sum_insured_options", "in_patient_hospitalisation", "room_rent", "pre_post_hospitalisation",
     "restore_recharge", "sum_insured_growth_bonus", "non_medical_expenses_cover", "domiciliary_home_care",
-    "air_ambulance", "health_checkup", "teleconsultation_opd", "maternity", "chronic_conditions_day1",
+    "air_ambulance", "health_checkup", "teleconsultation_opd", "opd", "maternity", "chronic_conditions_day1",
     "global_cover", "deductible_options", "copay", "waiting_period_initial", "waiting_period_specific",
     "waiting_period_ped", "exclusions", "family_composition", "pricing_zones", "premium_illustration", "discounts",
 ]
@@ -113,8 +117,8 @@ EXPOSURE_KEYWORD_MAP: dict[str, list[str]] = {
     "check-up": ["health_checkup"],
     "checkup": ["health_checkup"],
     "mental": ["teleconsultation_opd"],
-    "opd": ["teleconsultation_opd"],
-    "outpatient": ["teleconsultation_opd"],
+    "opd": ["opd"],
+    "outpatient": ["opd"],
     "telemedicine": ["teleconsultation_opd"],
     "remote": ["teleconsultation_opd", "network_hospitals", "domiciliary_home_care"],
     "distributed": ["network_hospitals", "pricing_zones"],
@@ -178,8 +182,12 @@ _DIRECT_REQUIREMENTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("from day 1", ("chronic_conditions_day1",)),
     ("chronic", ("chronic_conditions_day1",)),
     ("global cover", ("global_cover",)),
+    ("global treatment", ("global_cover",)),
+    ("international cover", ("global_cover",)),
+    ("global/international", ("global_cover",)),
     ("international treatment", ("global_cover",)),
-    ("wellness and opd", ("wellness_renewal_discount", "teleconsultation_opd")),
+    ("wellness and opd", ("wellness_renewal_discount", "opd")),
+    ("not applicable on accident", ("accident_waiting_exception",)),
     ("maternity", ("maternity",)),
     ("accident", ("personal_accident",)),
 )
@@ -187,8 +195,12 @@ _DIRECT_REQUIREMENTS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 def map_text_to_features(text: str, limit: int = 6) -> list[str]:
     t = text.lower()
+    # A waiting-period waiver for accident cases is not a request for personal accident cover.
+    waiting_exception = "not applicable on accident" in t or ("accident case" in t and "wait" in t)
     direct: list[str] = []
     for phrase, keys in _DIRECT_REQUIREMENTS:
+        if phrase == "accident" and waiting_exception and "personal accident" not in t and "accident cover" not in t:
+            continue
         if phrase in t:
             for key in keys:
                 if key not in direct:

@@ -12,6 +12,7 @@ class RequirementClass(str, Enum):
     MUST_HAVE = "MUST_HAVE"
     PREFERENCE = "PREFERENCE"
     BASELINE = "BASELINE"
+    EXPOSURE = "EXPOSURE"  # hypothesis. Weight stays 0 unless exposure_pool is configured.
 
 
 class CoverageExpectation(str, Enum):
@@ -150,6 +151,19 @@ class PolicyFitResult(BaseModel):
     client_requirements_resolved: bool = True
 
 
+class AlternativeFit(BaseModel):
+    """A decision-sufficient peer from the same fit list. Not a second ranking model."""
+
+    policy_id: str
+    policy_name: str
+    fit_score: float
+    evidence_completeness: float
+    decision_state: str
+    strong_matches: list[str] = Field(default_factory=list)
+    trade_offs: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+
+
 class Recommendation(BaseModel):
     recommended_policy_id: str
     policy_name: str
@@ -162,3 +176,4 @@ class Recommendation(BaseModel):
     competing_policy_ids: list[str] = Field(default_factory=list)
     comparison_incomplete: list[str] = Field(default_factory=list)
     unresolved_must_haves: list[str] = Field(default_factory=list)
+    alternatives: list[AlternativeFit] = Field(default_factory=list)

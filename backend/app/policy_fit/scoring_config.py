@@ -22,6 +22,8 @@ class ScoringConfig:
     must_have_fail_below: float = 40.0
     advisor_pool: float = 0.65
     baseline_pool: float = 0.35
+    # Exposure hypotheses stay out of fit until this pool is set above 0.
+    exposure_pool: float = 0.0
     # Completeness gate. It does not enter the fit average.
     min_decision_completeness: float = 0.5
     max_completeness_shortfall: float = 0.20

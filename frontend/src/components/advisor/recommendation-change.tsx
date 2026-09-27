@@ -52,6 +52,16 @@ export function RecommendationChange({ runId, onChanged }: { runId: string; onCh
       {result && (
         <div className="space-y-1 text-xs">
           <p className="text-body">{result.message}</p>
+          {result.interpreted_change && result.interpreted_change.length > 0 && (
+            <p className="text-muted-foreground">Interpreted change: {result.interpreted_change.join(" ")}</p>
+          )}
+          {result.old_weights && result.new_weights && (
+            <p className="text-muted-foreground">
+              Weights {result.old_weights.map((row) => `${row.feature} ${Math.round(row.weight * 100)}%`).join(", ") || "none"}
+              {" → "}
+              {result.new_weights.map((row) => `${row.feature} ${Math.round(row.weight * 100)}%`).join(", ")}
+            </p>
+          )}
           {result.scores && result.scores.length > 0 && (
             <ul className="space-y-0.5 text-muted-foreground">
               {result.scores.map((row) => (

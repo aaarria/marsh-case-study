@@ -42,7 +42,45 @@ def canonicalize_fact(fact: FeatureFact) -> FeatureFact:
     if _policy_mismatch(fact) or _status_contradicts_quote(fact):
         fact.coverage_status = CoverageStatus.REVIEW_REQUIRED
         fact.notes = ((fact.notes or "") + " Conflicting or mismatched evidence is REVIEW_REQUIRED, not a scored fact.").strip()
+    fact.coverage_tier = _coverage_tier(fact)
+    fact.cap_type = _cap_type(fact)
     return fact
+
+
+def _coverage_tier(fact: FeatureFact) -> str:
+    text = " ".join(part for part in (fact.value, fact.original_quote, fact.variant_scope, *(src.section or "" for src in fact.sources)) if part).lower()
+    if fact.coverage_status == CoverageStatus.REVIEW_REQUIRED:
+        return "REVIEW_REQUIRED"
+    if fact.coverage_status == CoverageStatus.EXCLUDED:
+        return "EXCLUDED"
+    if fact.coverage_status in {CoverageStatus.NOT_FOUND, CoverageStatus.UNKNOWN}:
+        return "NOT_ESTABLISHED"
+    if "rider" in text:
+        return "RIDER"
+    if fact.is_add_on or fact.coverage_status == CoverageStatus.ADD_ON:
+        if "optional" in text:
+            return "OPTIONAL"
+        return "ADD_ON"
+    if fact.coverage_status == CoverageStatus.CONDITIONAL or fact.variant_scope:
+        return "CONDITIONAL"
+    if fact.coverage_status == CoverageStatus.PARTIALLY_COVERED:
+        return "CONDITIONAL"
+    return "BASE"
+
+
+def _cap_type(fact: FeatureFact) -> str | None:
+    if fact.feature != "room_rent":
+        return None
+    text = " ".join(part for part in (fact.limit, fact.value, fact.original_quote) if part).lower()
+    if fact.coverage_status in {CoverageStatus.NOT_FOUND, CoverageStatus.UNKNOWN, CoverageStatus.REVIEW_REQUIRED}:
+        return "NOT_ESTABLISHED"
+    if "at actual" in text:
+        return "ACTUALS"
+    if any(token in text for token in ("up to si", "up to sum insured", "up to the sum insured", "base sum insured")):
+        return "SUM_INSURED"
+    if any(token in text for token in ("no sub-limit", "no sublimit", "no capping", "unlimited")):
+        return "NONE"
+    return None
 
 
 def extract_condition_details(fact: FeatureFact) -> list[FactCondition]:

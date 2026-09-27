@@ -184,6 +184,18 @@ def get_run(run_id: str):
         raise HTTPException(404, "Run not found")
 
 
+@router.delete("/runs/{run_id}")
+def delete_run(run_id: str):
+    """Remove a pitch from the list. A run that is still generating is left in place."""
+    try:
+        runs.delete_run(run_id)
+    except runs.RunNotFound:
+        raise HTTPException(404, "Run not found")
+    except runs.RunStateError as exc:
+        raise HTTPException(409, str(exc))
+    return {"run_id": run_id, "deleted": True}
+
+
 @router.post("/runs/{run_id}/retry")
 def retry_run(run_id: str):
     """Resume a failed run (e.g. after a Gemini free-tier quota window resets). Same model, no substitution."""

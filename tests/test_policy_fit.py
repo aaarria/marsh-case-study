@@ -47,7 +47,7 @@ def _exposures():
 def test_matrix_cells_keep_provenance():
     m = build_matrix(_results(), features=["maternity", "air_ambulance"], policy_order=["A", "B", "C"])
     assert m.cells["maternity"]["A"].status == CoverageStatus.EXCLUDED
-    assert m.cells["maternity"]["B"].display == "Not found"
+    assert m.cells["maternity"]["B"].display == "Not specified in supplied brochure"
     assert m.cells["air_ambulance"]["A"].fact.sources[0].page == 2
     assert cell_display(m.cells["air_ambulance"]["B"].fact).startswith("Add-on")
 

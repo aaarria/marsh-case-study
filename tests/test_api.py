@@ -205,6 +205,26 @@ def test_orphaned_running_run_is_marked_interrupted_and_retryable(client):
             c.execute("DELETE FROM run_events WHERE run_id=?", (run_id,))
 
 
+def test_delete_removes_a_pitch_from_the_list(client):
+    from app.graph.nodes import store
+
+    st = store()
+    run_id = "run_delete_me"
+    st.save_run(run_id, "POPXO", "awaiting_review", {"policy_ids": []})
+    st.add_event(run_id, "audit_pitch", "completed", "audited")
+    st.save_artifact(run_id, "pitch", {"slides": []})
+    try:
+        assert any(r["run_id"] == run_id for r in client.get("/api/runs?limit=100").json()["runs"])
+        gone = client.delete(f"/api/runs/{run_id}")
+        assert gone.status_code == 200 and gone.json()["deleted"] is True
+        assert client.get(f"/api/runs/{run_id}").status_code == 404
+        assert all(r["run_id"] != run_id for r in client.get("/api/runs?limit=100").json()["runs"])
+        assert st.get_artifact(run_id, "pitch") is None
+        assert client.delete(f"/api/runs/{run_id}").status_code == 404
+    finally:
+        st.delete_run(run_id)
+
+
 def test_concurrent_launches_are_serialised(client, monkeypatch):
     """Double-submitting an answer must not resume a graph twice; the run ceiling must answer 429."""
     import threading
