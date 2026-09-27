@@ -37,8 +37,8 @@ function CellDetail({ cell }: { cell: ScenarioCell }) {
       </div>
       <p className="mt-1 text-xs text-body">{cell.explanation || "No explanation was recorded for this cell."}</p>
       <div className="mt-1 flex gap-2 text-2xs">
-        <button type="button" className="focus-ring text-ink underline-offset-2 hover:underline" onClick={() => setLevel("evidence")}>Evidence</button>
-        <button type="button" className="focus-ring text-ink underline-offset-2 hover:underline" onClick={() => setLevel("technical")}>Technical detail</button>
+        <Button type="button" size="xs" variant="outline" onClick={() => setLevel("evidence")}>Evidence</Button>
+        <Button type="button" size="xs" variant="outline" onClick={() => setLevel("technical")}>Technical detail</Button>
       </div>
       {level !== "summary" && (
         <div className="mt-2 space-y-1">

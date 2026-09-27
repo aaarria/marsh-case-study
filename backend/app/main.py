@@ -49,8 +49,8 @@ app = FastAPI(title="Marsh Evidence-First Insurance Advisory API", version="0.1.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origin_list,
-    # Vercel previews plus any localhost port, so a dev frontend on 3000/3457/… works without editing .env.
-    allow_origin_regex=r"https://.*\.vercel\.app|http://(localhost|127\.0\.0\.1)(:\d+)?",
+    # Vercel production, Amplify (the AWS site), and any localhost port.
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.amplifyapp\.com|http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

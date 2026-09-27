@@ -63,12 +63,12 @@ export default function Composer() {
 
   return (
     <AppShell>
-      <main className="thin-scroll flex flex-1 flex-col items-center overflow-y-auto px-6 py-10">
-        <div className="w-full max-w-2xl space-y-6">
+      <main className="thin-scroll flex flex-1 flex-col items-center overflow-y-auto px-8 py-14">
+        <div className="w-full max-w-2xl space-y-10">
           {readiness.error && <ErrorBlock message={readiness.error} title="API unavailable" />}
           <SystemNotice r={readiness} detailed />
           <div className="pt-2 text-center">
-            <h1 className="display text-3xl sm:text-4xl">Marsh Health Policy Advisory</h1>
+            <h1 className="display text-4xl sm:text-5xl">Marsh Health Policy Advisory</h1>
             <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">Evidence-led health insurance comparison and advisory system</p>
             <details className="mx-auto mt-4 max-w-md text-left">
               <summary className="cursor-pointer text-sm text-ink">Who are we advising?</summary>
@@ -91,7 +91,7 @@ export default function Composer() {
             }}
             className="panel overflow-hidden"
           >
-            <div className="flex items-end gap-2 p-3">
+            <div className="flex items-end gap-3 p-5">
               <textarea
                 autoFocus
                 rows={1}
@@ -106,14 +106,14 @@ export default function Composer() {
                 }}
                 placeholder="Company name, e.g. Tata Consultancy Services"
                 aria-label="Company name"
-                className="min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-lg text-ink outline-none placeholder:text-quiet"
+                className="min-h-11 flex-1 resize-none rounded-md border border-hairline bg-white px-3 py-2 text-lg text-ink outline-none placeholder:text-quiet focus:border-marsh-navy"
               />
-              <Button type="submit" size="icon" disabled={!canSend} loading={submitting} aria-label="Start pitch" title={name.length < 2 ? "Type the company name to start" : tooFew ? `Keep at least ${MIN_POLICIES} policies` : undefined}>
-                <ArrowUp className="size-4" />
+              <Button type="submit" disabled={!canSend} loading={submitting} aria-label="Start pitch" title={name.length < 2 ? "Type the company name to start" : tooFew ? `Keep at least ${MIN_POLICIES} policies` : undefined}>
+                Start pitch <ArrowUp className="size-4" />
               </Button>
             </div>
 
-            <div className="border-t border-hairline px-3 py-2">
+            <div className="border-t border-hairline px-5 py-4">
               <ChipGroup label="Client priorities">
                 {[...PRIORITY_SUGGESTIONS, ...priorities.filter((p) => !PRIORITY_SUGGESTIONS.includes(p))].map((p) => (
                   <Chip key={p} size="xs" selected={priorities.includes(p)} onClick={() => setPriorities((s) => (s.includes(p) ? s.filter((x) => x !== p) : [...s, p]))}>
@@ -124,7 +124,7 @@ export default function Composer() {
               <p className="mt-1.5 text-2xs text-quiet">Selected priorities directly shape policy fit. Leave them empty for a baseline comparison.</p>
             </div>
 
-            <div className="border-t border-hairline px-3 py-3">
+            <div className="border-t border-hairline px-5 py-5">
               <p className="text-sm text-ink">Select the policy brochures to compare</p>
               <p className="mt-1 text-2xs text-quiet">{policies.length === 0 ? "Loading the ingested brochures…" : `Comparing ${selected.length} ingested brochure${selected.length === 1 ? "" : "s"}.`}</p>
               {tooFew && <p className="tone-danger tint-text mt-1.5 text-xs">Keep at least {MIN_POLICIES} policies: a recommendation needs something to be compared against.</p>}
@@ -137,7 +137,7 @@ export default function Composer() {
                       type="button"
                       aria-pressed={on}
                       onClick={() => setSelected((s) => (s.includes(p.policy_id) ? s.filter((x) => x !== p.policy_id) : [...s, p.policy_id]))}
-                      className={cn("flex min-h-16 flex-col items-start justify-between border px-3 py-2 text-left", on ? "border-marsh-navy bg-marsh-navy text-white" : "border-hairline-strong bg-transparent text-ink")}
+                      className={cn("flex min-h-20 flex-col items-start justify-between rounded-md border px-4 py-3 text-left transition-colors", on ? "border-marsh-navy bg-marsh-navy text-white" : "border-hairline-strong bg-white text-ink hover:border-marsh-navy")}
                     >
                       <span className={cn("text-2xs font-semibold tracking-wide", on ? "text-white/80" : "text-quiet")}>{on ? "SELECTED" : "NOT SELECTED"}</span>
                       <span className="text-sm font-medium">{p.policy_name}</span>
@@ -146,7 +146,7 @@ export default function Composer() {
                 })}
               </div>
               <div className="mt-3">
-                <label className="inline-flex cursor-pointer border border-hairline-strong px-3 py-2 text-sm text-ink">
+                <label className="inline-flex cursor-pointer rounded-md border border-marsh-navy bg-white px-4 py-2.5 text-sm font-medium text-marsh-navy hover:bg-marsh-cream">
                   <input
                     type="file"
                     accept="application/pdf,.pdf"

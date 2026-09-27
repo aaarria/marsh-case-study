@@ -26,9 +26,9 @@
   --base-hue: 258;           /* Marsh navy #002C77 */
   --base-chroma: 0.04;
   --accent-hue: 198;         /* Marsh cyan #00A8C7 */
-  --marsh-navy: #002c77;
+  --marsh-navy: #00143f;
   --marsh-white: #ffffff;
-  --marsh-cream: #f7f4ef;
+  --marsh-cream: #f7f5f0;
   --contrast: 1;             /* 1 = default; >1 = higher-contrast theme */
 
   /* --- type ---------------------------------------------------------------- */
@@ -57,7 +57,7 @@
   --dur-slow: 320ms;
 
   /* --- slide: Marsh logo palette on the cream page ground from marsh.com ---- */
-  --slide-bg: #f7f4ef;
+  --slide-bg: #f7f5f0;
   --slide-ink: var(--marsh-navy);
   --slide-body: #1a2744;
   --slide-muted: #5c6b80;
@@ -74,39 +74,38 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Dark chrome: Marsh navy #002C77 and white. No yellow, no cyan fills.
+   Light Marsh chrome. Navy is reserved for actions, selection, and the logo.
    --------------------------------------------------------------------------- */
 :root {
-  --canvas:   #000814;
-  --panel:    var(--marsh-navy);
-  --surface:  #001833;
-  --raised:   #002c77;
-  --overlay:  #001428;
-  --veil:     #000814cc;
+  --canvas:   var(--marsh-cream);
+  --panel:    var(--marsh-white);
+  --surface:  var(--marsh-white);
+  --raised:   #efece6;
+  --overlay:  var(--marsh-white);
+  --veil:     #00143fcc;
 
-  --ink:      var(--marsh-white);
-  --body:     color-mix(in srgb, var(--marsh-white) 88%, transparent);
-  --ink-muted: color-mix(in srgb, var(--marsh-white) 72%, transparent);
-  --quiet:    color-mix(in srgb, var(--marsh-white) 52%, transparent);
+  --ink:      var(--marsh-navy);
+  --body:     #243044;
+  --ink-muted: #5c6573;
+  --quiet:    #6d7582;
 
-  --hairline:        color-mix(in srgb, var(--marsh-white) 12%, transparent);
-  --hairline-strong: color-mix(in srgb, var(--marsh-white) 22%, transparent);
-  --hairline-bright: color-mix(in srgb, var(--marsh-white) 45%, transparent);
+  --hairline:        #e3ddd4;
+  --hairline-strong: #cfc6ba;
+  --hairline-bright: #00143f;
 
-  --accent:      var(--marsh-white);
+  --accent:      var(--marsh-navy);
 
-  --ok:      oklch(0.72 0.16 150);  --ok-fg:      oklch(0.8 0.14 150);
-  --warn:    oklch(0.8 0.15 80);    --warn-fg:    oklch(0.85 0.13 85);
-  --danger:  oklch(0.68 0.19 25);   --danger-fg:  oklch(0.78 0.15 25);
-  --info:    var(--marsh-white);  --info-fg:    var(--marsh-white);
-  --neutral: oklch(0.6 0.008 var(--base-hue)); --neutral-fg: var(--ink-muted);
+  --ok:      #1f7a4d;  --ok-fg:      #1f7a4d;
+  --warn:    #8a5a12;  --warn-fg:    #8a5a12;
+  --danger:  #8e2f2f;  --danger-fg:  #8e2f2f;
+  --info:    var(--marsh-navy);  --info-fg:    var(--marsh-navy);
+  --neutral: #6d7582; --neutral-fg: var(--ink-muted);
 
-  /* depth comes from the ladder; shadows only add a hairline */
   --shadow-1: 0 0 0 1px var(--hairline);
-  --shadow-2: 0 0 0 1px var(--hairline-strong), 0 8px 24px -8px oklch(0 0 0 / 0.5);
-  --shadow-3: 0 0 0 1px var(--hairline-strong), 0 24px 64px -16px oklch(0 0 0 / 0.7);
+  --shadow-2: 0 0 0 1px var(--hairline), 0 10px 28px -18px rgb(0 20 63 / 0.35);
+  --shadow-3: 0 0 0 1px var(--hairline), 0 24px 48px -24px rgb(0 20 63 / 0.28);
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 /* ---------------------------------------------------------------------------
@@ -117,17 +116,17 @@
   --foreground: var(--ink);
   --popover: var(--overlay);
   --popover-foreground: var(--ink);
-  --primary: var(--marsh-white);
-  --primary-foreground: var(--marsh-navy);
-  --secondary: var(--raised);
-  --secondary-foreground: var(--ink);
+  --primary: var(--marsh-navy);
+  --primary-foreground: var(--marsh-white);
+  --secondary: var(--marsh-white);
+  --secondary-foreground: var(--marsh-navy);
   --muted: var(--raised);
   --muted-foreground: var(--ink-muted);
-  --accent: var(--raised);               /* shadcn "accent" = hover fill, not brand */
+  --accent: #e7eef6;               /* shadcn "accent" = hover fill, not brand */
   --destructive: var(--danger);
   --border: var(--hairline);
   --input: var(--hairline-strong);
-  --ring: var(--marsh-white);
+  --ring: var(--marsh-navy);
 }
 
 /* ---------------------------------------------------------------------------
@@ -137,7 +136,7 @@
 @theme inline {
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-slide-serif);
 
   --font-weight-medium: 510;
   --font-weight-semibold: 590;
@@ -254,7 +253,7 @@
     letter-spacing: var(--tracking-title);
   }
   ::selection {
-    background: color-mix(in oklch, var(--accent) 28%, transparent);
+    background: color-mix(in srgb, var(--marsh-navy) 16%, transparent);
   }
   button, [role="button"] {
     -webkit-tap-highlight-color: transparent;
@@ -320,8 +319,10 @@
 
   /* Display type: compressed, editorial. */
   .display {
-    letter-spacing: var(--tracking-display);
-    @apply font-semibold text-ink;
+    letter-spacing: -0.02em;
+    @apply font-slide-serif text-ink;
+    font-weight: 500;
+    line-height: 1.15;
   }
 
   /* Hairline-framed surface; the default container. */

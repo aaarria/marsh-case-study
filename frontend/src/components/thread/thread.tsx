@@ -273,6 +273,7 @@ function AnsweredQuestion({ item, state, policyName }: { item: Extract<ThreadIte
 
 function FailureMessage({ run, onRetry, retrying, retryError }: { run: RunSummary; onRetry: () => void; retrying: boolean; retryError: string | null }) {
   const quota = run.error_kind === "quota";
+  const groqLimit = /groq/i.test(run.error || "");
   const interrupted = run.error_kind === "interrupted";
   const failedAt = useMemo(() => toMs(run.updated_at), [run.updated_at]);
   const [now, setNow] = useState(() => Date.now());
@@ -289,7 +290,7 @@ function FailureMessage({ run, onRetry, retrying, retryError }: { run: RunSummar
     </Button>
   );
   return (
-    <Callout tone={quota || interrupted ? "warn" : "danger"} icon={interrupted ? Unplug : quota ? TimerReset : undefined} title={interrupted ? "Interrupted by a server restart" : quota ? "Gemini free-tier limit reached. Paused, not lost." : "This step failed"} actions={retryBtn}>
+    <Callout tone={quota || interrupted ? "warn" : "danger"} icon={interrupted ? Unplug : quota ? TimerReset : undefined} title={interrupted ? "Interrupted by a server restart" : quota ? (groqLimit ? "Groq rate limit reached. Paused, not lost." : "Gemini free-tier limit reached. Paused, not lost.") : "This step failed"} actions={retryBtn}>
       <span className="break-words">{run.error}</span>
       <p className="mt-1 text-xs text-muted-foreground">{quota ? `Progress is checkpointed; retrying resumes from the failed step with the same model. Retrying before the reset hits the same limit again.${run.retry_after != null ? ` Expected reset: ${formatWait(remaining)}.` : ""}` : "Completed steps are kept. Retrying re-runs only the step that failed."}</p>
       {retryError && <p className="mt-1 text-xs font-medium">Retry failed: {retryError}</p>}
@@ -342,7 +343,7 @@ export function Thread({ state, deck, policyName, refresh }: { state: RunState; 
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div ref={boxRef} className="thin-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+      <div ref={boxRef} className="thin-scroll min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
         {items.map((item, i) => (
           <StreamScope key={i} value={i >= mountCount}>
             {(() => {
