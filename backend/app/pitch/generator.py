@@ -426,6 +426,17 @@ def _advisor_priorities(exposures: list[Exposure]) -> list[Exposure]:
     return [e for e in exposures if "advisor_priority" in (e.basis or []) or e.title.lower().startswith("advisor priority")]
 
 
+def _headcount(profile: CompanyProfile) -> str | None:
+    """A stated headcount. A size phrase with no number is not turned into an employee figure."""
+    texts = [profile.size or ""]
+    texts.extend(fact.text for fact in profile.facts if fact.field == "size" and fact.text)
+    for text in texts:
+        cleaned = " ".join(text.split()).strip()
+        if cleaned and cleaned.lower() != "unknown" and re.search(r"\d", cleaned):
+            return cleaned
+    return None
+
+
 def _context_slide(profile: CompanyProfile, exposures: list[Exposure], pack: EvidencePack) -> Slide:
     """Who the client is, what they asked for, and what the advisory is weighing."""
     slide = Slide(
@@ -435,9 +446,14 @@ def _context_slide(profile: CompanyProfile, exposures: list[Exposure], pack: Evi
         layout="glance",
         bullets=[],
     )
-    for label, value in (("INDUSTRY", profile.industry), ("SCALE", profile.size), ("FOOTPRINT", profile.geography)):
+    employees = _headcount(profile)
+    for label, value in (("INDUSTRY", profile.industry), ("FOOTPRINT", profile.geography)):
         if value:
             slide.bullets.append(SlideBullet(text=f"{label}|{value}", kind="company"))
+    if employees:
+        slide.bullets.append(SlideBullet(text=f"EMPLOYEES|{employees}", kind="company"))
+    elif profile.size:
+        slide.bullets.append(SlideBullet(text=f"SCALE|{profile.size}", kind="company"))
     priorities = _advisor_priorities(exposures)
     if priorities:
         for exposure in priorities[:2]:

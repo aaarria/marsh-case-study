@@ -180,7 +180,7 @@ export function SlideCanvas({ slide, index, total, disclaimer, refsByChunk = {},
       </button>
     ));
 
-  const glanceFacts = parsed.filter((x) => ["INDUSTRY", "SCALE", "FOOTPRINT"].includes(x.label.toUpperCase())).slice(0, 3);
+  const glanceFacts = parsed.filter((x) => ["INDUSTRY", "SCALE", "FOOTPRINT", "EMPLOYEES"].includes(x.label.toUpperCase())).slice(0, 4);
   const glanceCards = parsed.filter((x) => !glanceFacts.includes(x) && (x.b.kind === "company" || x.b.kind === "assumption")).slice(0, 4);
   const mapExposures = parsed.filter((x) => x.b.kind === "company" || x.b.kind === "assumption").slice(0, 3);
   const mapBenefits = parsed.filter((x) => x.b.kind === "policy").slice(0, 3);
@@ -202,7 +202,8 @@ export function SlideCanvas({ slide, index, total, disclaimer, refsByChunk = {},
   ));
   const whyNote = parsed.find((p) => p.label.toUpperCase() === "WHY");
   const lens = parsed.find((p) => p.label.toUpperCase() === "LENS");
-  const profileSlide = glanceFacts.filter((f) => ["INDUSTRY", "SCALE", "FOOTPRINT"].includes(f.label.toUpperCase())).length >= 3;
+  const profileLabels = new Set(glanceFacts.map((f) => f.label.toUpperCase()));
+  const profileSlide = profileLabels.has("INDUSTRY") && profileLabels.has("FOOTPRINT") && (profileLabels.has("SCALE") || profileLabels.has("EMPLOYEES"));
   if ((slide.layout === "glance" || profileSlide) && (priorities.length > 0 || lens || considered.length > 0)) {
     const known = glanceFacts.filter((f) => f.body && f.body.toLowerCase() !== "not established");
     body = (

@@ -539,7 +539,7 @@ def _priorities(slide, content: Slide, page: int):
         elif label.upper() == "CONSIDERED" and body:
             assessed.append(body)
     lens = next((body for label, body in (_parts(b.text) for b in content.bullets) if label.upper() == "LENS" and body), "")
-    facts = [(label, body) for label, body in (_parts(b.text) for b in content.bullets) if label.upper() in {"INDUSTRY", "SCALE", "FOOTPRINT"} and body and body.lower() != "not established"]
+    facts = [(label, body) for label, body in (_parts(b.text) for b in content.bullets) if label.upper() in {"INDUSTRY", "SCALE", "FOOTPRINT", "EMPLOYEES"} and body and body.lower() != "not established"]
 
     y = Inches(1.48)
     if priorities:
@@ -662,7 +662,7 @@ def _profile_slide(content: Slide) -> bool:
     for bullet in content.bullets:
         label, _body = _parts(bullet.text)
         labels.add(label.upper())
-    return {"INDUSTRY", "SCALE", "FOOTPRINT"} <= labels
+    return {"INDUSTRY", "FOOTPRINT"} <= labels and bool(labels & {"SCALE", "EMPLOYEES"})
 
 
 def _editorial_list(slide, content: Slide, page: int, markers: dict[int, list[Reference]]):

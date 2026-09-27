@@ -186,7 +186,9 @@ def _relax_payload(data: Any) -> Any:
         return data
     out = {key: _relax_payload(value) for key, value in data.items()}
     if isinstance(out.get("kind"), str):
-        out["kind"] = out["kind"].strip().upper()
+        token = out["kind"].strip()
+        # Company facts carry a field name and use FACT / UNKNOWN. Pitch bullets do not, and use policy / company.
+        out["kind"] = token.upper() if "field" in out else token.lower()
     if "confidence" in out:
         try:
             out["confidence"] = max(0.0, min(1.0, float(out["confidence"])))

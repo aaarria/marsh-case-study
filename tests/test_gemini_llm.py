@@ -56,6 +56,8 @@ def test_groq_schema_drops_null_unions_and_still_parses_a_profile():
     assert parsed.facts[0].source_ids == ["S1"]
     assert parsed.facts[0].confidence == 1.0
     assert parsed.size is None and parsed.geography is None and parsed.workforce is None
+    from app.services.llm import _relax_payload
+    assert _relax_payload({"kind": "COMPANY", "text": "BMW"})["kind"] == "company"
 
 
 def test_quota_error_found_through_exception_chain():
