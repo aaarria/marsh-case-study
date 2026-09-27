@@ -12,13 +12,14 @@ STATUS_VALUE = {
     CoverageStatus.EXCLUDED: 0.0,
     CoverageStatus.NOT_FOUND: None,
     CoverageStatus.UNKNOWN: None,
+    CoverageStatus.REVIEW_REQUIRED: None,
 }
 
 TERMS_FEATURES = {"waiting_period_initial", "waiting_period_specific", "waiting_period_ped", "exclusions", "copay", "deductible_options", "pricing_zones", "premium_illustration", "tenure", "eligibility_entry_age", "renewal_portability"}
 
 
 def _rationale(fact: FeatureFact) -> str:
-    if fact.coverage_status in {CoverageStatus.NOT_FOUND, CoverageStatus.UNKNOWN}:
+    if fact.coverage_status in {CoverageStatus.NOT_FOUND, CoverageStatus.UNKNOWN, CoverageStatus.REVIEW_REQUIRED}:
         return "The brochure does not address this feature; treated as unknown, not as excluded."
     parts = []
     if fact.value:

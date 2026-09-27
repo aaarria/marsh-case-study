@@ -28,22 +28,21 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
 
   return (
     <div className="flex h-dvh bg-canvas">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-hairline bg-panel text-body">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-[#e4ddd6] bg-marsh-cream text-marsh-navy">
         <div className="flex h-12 items-center px-4">
           <Link href="/" className="focus-ring flex items-center gap-2 rounded-md" aria-label="Marsh Advisory — home">
-            <Image src="/marsh-symbol-white.png" alt="Marsh McLennan" width={1024} height={608} priority className="h-3.5 w-auto" />
-            <span className="text-sm font-medium tracking-title text-body">Marsh Advisory</span>
+            <Image src="/marsh.png" alt="Marsh McLennan" width={1024} height={84} priority className="h-4 w-auto" />
           </Link>
         </div>
         <div className="px-3 pb-2">
-          <Link href="/" className="focus-ring flex h-8 items-center justify-center gap-1.5 rounded-md bg-ink text-sm font-medium text-canvas transition-[transform,opacity] duration-(--dur-fast) hover:opacity-90 active:scale-[0.985]">
+          <Link href="/" className="focus-ring flex h-8 items-center justify-center gap-1.5 rounded-md bg-marsh-navy text-sm font-medium text-marsh-white transition-[transform,opacity] duration-(--dur-fast) hover:opacity-90 active:scale-[0.985]">
             <Plus className="size-3.5" /> New pitch
           </Link>
         </div>
         <nav className="thin-scroll flex-1 overflow-y-auto px-2 pb-3" aria-label="Pitches">
-          <div className="kicker px-2 pb-1 pt-2 text-quiet">Pitches</div>
+          <div className="kicker px-2 pb-1 pt-2 text-marsh-navy/55">Pitches</div>
           {recent.length === 0 ? (
-            <p className="px-2 py-1 text-xs text-quiet">Nothing yet.</p>
+            <p className="px-2 py-1 text-xs text-marsh-navy/55">Nothing yet.</p>
           ) : (
             <ul className="space-y-px">
               {recent.map((r) => {
@@ -51,10 +50,10 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
                 const on = r.run_id === runId;
                 return (
                   <li key={r.run_id}>
-                    <Link href={`/runs/${r.run_id}`} aria-current={on ? "page" : undefined} title={`${r.company_name} · ${rs.label}`} className={cn("focus-ring flex h-8 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-(--dur-fast)", on ? "bg-raised text-ink" : "text-body hover:bg-raised/70 hover:text-ink")}>
+                    <Link href={`/runs/${r.run_id}`} aria-current={on ? "page" : undefined} title={`${r.company_name} · ${rs.label}`} className={cn("focus-ring flex h-8 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-(--dur-fast)", on ? "bg-marsh-navy text-marsh-white" : "text-marsh-navy hover:bg-marsh-navy/10")}>
                       <span className={cn(`tone-${rs.tone} tint-dot size-1.5 shrink-0 rounded-full`)} aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{r.company_name}</span>
-                      <span className="shrink-0 text-2xs tabular-nums text-quiet">{r.status === "awaiting_review" ? "needs you" : fmtRelative(r.updated_at)}</span>
+                      <span className={cn("shrink-0 text-2xs tabular-nums", on ? "text-marsh-white/70" : "text-marsh-navy/50")}>{r.status === "awaiting_review" ? "needs you" : fmtRelative(r.updated_at)}</span>
                     </Link>
                   </li>
                 );

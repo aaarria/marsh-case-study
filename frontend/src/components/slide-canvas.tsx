@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Image from "next/image";
 import type { AuditStatus, Slide, SlideBullet, SourceRef } from "@/lib/types";
 import { Stream } from "@/components/stream";
@@ -11,6 +12,48 @@ function slideCitations(slide: Slide): string[] {
   const seen: string[] = [];
   for (const b of slide.bullets) for (const c of b.source_chunk_ids) if (!seen.includes(c)) seen.push(c);
   return seen;
+}
+
+const GENERIC = new Set(["TITLE", "EXPOSURE", "CARD", "BENEFIT", "ITEM", "POINT", "LABEL"]);
+
+function splitBullet(text: string): { label: string; body: string } {
+  let raw = text.trim();
+  for (const prefix of ["assumption:", "why this policy:", "watch-out:"]) {
+    if (raw.toLowerCase().startsWith(prefix)) raw = raw.slice(prefix.length).trim();
+  }
+  let label = "";
+  let body = raw;
+  if (raw.includes("|")) {
+    const [a, b] = raw.split("|", 2);
+    label = a.trim();
+    body = b.trim();
+  } else if (raw.includes(":") && raw.split(":", 1)[0].length <= 36) {
+    const [a, b] = raw.split(":", 2);
+    label = a.trim();
+    body = b.trim();
+  }
+  if (!label || GENERIC.has(label.toUpperCase()) || body.toLowerCase() === label.toLowerCase()) return { label: body, body: "" };
+  return { label, body };
+}
+
+function clientLine(title: string, subtitle: string | null | undefined, facts: { label: string; body: string }[]): string {
+  if (subtitle && subtitle.trim().split(/\s+/).length >= 8) return subtitle.trim();
+  const by = Object.fromEntries(facts.map((f) => [f.label.toUpperCase(), f.body]));
+  const ok = (v?: string) => (v && !["unknown", "not established", "none", "n/a"].includes(v.trim().toLowerCase()) ? v.trim().replace(/\.$/, "") : "");
+  const industry = ok(by.INDUSTRY);
+  const scale = ok(by.SCALE);
+  const footprint = ok(by.FOOTPRINT);
+  const bits: string[] = [];
+  if (industry) {
+    const word = industry[0].toLowerCase() + industry.slice(1);
+    bits.push(word.startsWith("a ") || word.startsWith("an ") ? word : `a ${word} business`);
+  }
+  if (scale) bits.push(scale[0].toLowerCase() + scale.slice(1));
+  if (footprint) bits.push(footprint[0].toLowerCase() + footprint.slice(1));
+  if (!bits.length) return "Company facts are still thin. The points below are working assumptions for the medical programme.";
+  const company = title.replace(/\s+at a glance$/i, "").trim() || "This client";
+  const sentence = `${company} is ${bits.join(", ")}`;
+  return sentence.endsWith(".") ? sentence : `${sentence}.`;
 }
 
 const ISSUE: AuditStatus[] = ["CONTRADICTED", "NOT_FOUND"];
@@ -149,34 +192,150 @@ export function SlideCanvas({ slide, index, total, disclaimer, refsByChunk = {},
     </div>
   );
 
-  const subtitle = slide.subtitle && <div className="mb-[1.2cqw] shrink-0 text-cq-1.25 leading-snug text-slide-muted">{slide.subtitle}</div>;
+  const parsed = slide.bullets.map((b, i) => ({ b, i, ...splitBullet(b.text) }));
+  const citeMarks = (item: Item) =>
+    !thumb &&
+    item.b.source_chunk_ids.map((cid) => (
+      <button key={cid} type="button" className="cite ml-[0.25em]" data-active={activeCite === cid} onClick={(e) => { e.stopPropagation(); onCite?.(cid); }}>
+        {num(cid)}
+      </button>
+    ));
 
-  const map = slide.layout === "map";
-  const mapItems = slide.bullets.map((b, i) => ({ b, i }));
-  const exposures = mapItems.filter((x) => x.b.kind === "company" || x.b.kind === "assumption").slice(0, 3);
-  const benefits = mapItems.filter((x) => x.b.kind === "policy").slice(0, 3);
-  const why = mapItems.find((x) => x.b.kind === "recommendation" || x.b.kind === "marsh");
-  const mapRows = Math.max(exposures.length, benefits.length, 1);
+  const glanceFacts = parsed.filter((x) => ["INDUSTRY", "SCALE", "FOOTPRINT"].includes(x.label.toUpperCase())).slice(0, 3);
+  const glanceCards = parsed.filter((x) => !glanceFacts.includes(x) && (x.b.kind === "company" || x.b.kind === "assumption")).slice(0, 4);
+  const mapExposures = parsed.filter((x) => x.b.kind === "company" || x.b.kind === "assumption").slice(0, 3);
+  const mapBenefits = parsed.filter((x) => x.b.kind === "policy").slice(0, 3);
+  const why = parsed.find((x) => x.b.kind === "recommendation");
+  const marshLines = parsed.filter((x) => x.b.kind === "marsh").slice(0, 3);
+  const watches = parsed.filter((x) => x.b.kind !== "marsh").slice(0, 4);
+  const score = parsed.find((x) => x.label.toUpperCase() === "SCORE" || /\d+(?:\.\d+)?\s*\/\s*100/.test(x.b.text));
+  const scoreValue = (score?.body || score?.b.text || "").match(/(\d+(?:\.\d+)?)\s*\/\s*100/)?.[1]?.split(".")[0];
+  const reasons = parsed.filter((x) => x !== score && x.label.toUpperCase() !== "TRADEOFF" && x.b.kind !== "assumption" && (x.b.kind === "recommendation" || x.b.kind === "policy")).slice(0, 3);
+  const trade = parsed.find((x) => x.label.toUpperCase() === "TRADEOFF" || (x.b.kind === "assumption" && x !== score));
 
-  const mapCard = (item: Item | undefined, side: "exposure" | "benefit") => {
-    if (!item) return <div />;
-    const assumption = item.b.kind === "assumption";
-    const text = item.b.text.replace(/^(assumption|why this policy):\s*/i, "");
-    return (
-      <div className="flex min-h-0 flex-col justify-center border border-slide-rule bg-slide-bg px-[1.2cqw] py-[0.7cqw]" style={{ borderLeftWidth: "0.35cqw", borderLeftColor: side === "exposure" ? "var(--slide-sky)" : "var(--slide-accent)" }}>
-        <div className={cn("text-cq-0.75 font-bold uppercase tracking-wide", side === "benefit" ? "text-slide-accent" : "text-slide-muted")}>{assumption ? "Assumption" : side === "benefit" ? "Brochure benefit" : "From the profile"}</div>
-        <div className="mt-[0.3cqw] line-clamp-3 text-cq-1.25 leading-snug text-slide-ink">
-          {text}
-          {side === "benefit" && !thumb &&
-            item.b.source_chunk_ids.map((cid) => (
-              <button key={cid} type="button" className="cite ml-[0.25em]" data-active={activeCite === cid} onClick={(e) => { e.stopPropagation(); onCite?.(cid); }}>
-                {num(cid)}
-              </button>
+  let body: ReactNode;
+  if (slide.layout === "glance") {
+    body = (
+      <div className="flex h-full flex-col px-[4.6%] pt-[1cqw] pb-[1cqw]">
+        <div className="grid min-h-0 flex-1 grid-cols-[1.15fr_1fr] gap-[3cqw]">
+          <p className="font-slide-serif text-cq-1.5 leading-snug text-slide-ink">{clientLine(slide.title, slide.subtitle, glanceFacts)}</p>
+          <div className="space-y-[1.2cqw]">
+            {glanceFacts.map((f) => (
+              <div key={f.i}>
+                <div className="text-cq-0.75 font-bold uppercase tracking-wide text-slide-muted">{f.label}</div>
+                <div className="text-cq-1.25 leading-snug text-slide-ink">{f.body}{citeMarks(f)}{f.b.kind === "assumption" && <div className="text-cq-0.75 text-slide-muted">Assumption</div>}</div>
+              </div>
             ))}
+          </div>
+        </div>
+        {glanceCards.length > 0 && (
+          <div className="mt-[1cqw] grid shrink-0 grid-cols-4 gap-[1.6cqw] border-t border-slide-rule pt-[1cqw]">
+            {glanceCards.map((c) => (
+              <div key={c.i}>
+                <div className="mb-[0.4cqw] h-[0.35cqw] w-full bg-slide-sky" />
+                <div className="font-slide-serif text-cq-1.25 leading-tight text-slide-ink">{c.label}</div>
+                {c.body && <div className="mt-[0.3cqw] line-clamp-3 text-cq-1 leading-snug text-slide-body">{c.body}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  } else if (slide.layout === "map") {
+    const rows = Math.max(mapExposures.length, mapBenefits.length, 1);
+    body = (
+      <div className="flex h-full flex-col px-[4.6%] pt-[1cqw] pb-[1cqw]">
+        <div className="grid grid-cols-[1.1fr_1.2fr_1.2fr_1fr] gap-[1cqw] text-cq-0.75 font-bold uppercase tracking-wide text-slide-muted">
+          <div>Exposure</div><div>Client need</div><div>Policy benefit</div><div>Evidence</div>
+        </div>
+        <div className="mt-[0.6cqw] min-h-0 flex-1 space-y-[0.7cqw]">
+          {Array.from({ length: rows }, (_, r) => {
+            const exp = mapExposures[r];
+            const ben = mapBenefits[r];
+            const ref = ben && refsByChunk[ben.b.source_chunk_ids[0]];
+            return (
+              <div key={r} className="grid grid-cols-[1.1fr_1.2fr_1.2fr_1fr] gap-[1cqw] border-t border-slide-rule pt-[0.5cqw]">
+                <div className="font-slide-serif text-cq-1.25 leading-tight text-slide-ink">{exp?.label}</div>
+                <div className="text-cq-1 leading-snug text-slide-body">{exp?.body || (exp ? "Identified for this client" : "")}</div>
+                <div className="text-cq-1 leading-snug text-slide-ink">{ben?.label}{ben && citeMarks(ben)}</div>
+                <div className="text-cq-1 leading-snug text-slide-muted">{ref ? `${ref.policy_name || ref.policy_id}, p.${ref.page}` : ""}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-[0.8cqw] shrink-0 bg-slide-ink px-[1.4cqw] py-[0.8cqw] text-white">
+          <div className="text-cq-0.75 font-bold uppercase tracking-wide text-slide-sky">Why this policy fits</div>
+          <div className="mt-[0.2cqw] text-cq-1.25 leading-snug">{why ? why.body || why.label : "Selected on the evidence in this deck. Advisor review is still required."}</div>
         </div>
       </div>
     );
-  };
+  } else if (slide.layout === "perspective") {
+    body = (
+      <div className="grid h-full grid-cols-2 px-[4.6%] pt-[1cqw] pb-[1cqw]">
+        <div className="space-y-[1.4cqw] pr-[2cqw]">
+          {marshLines.map((m) => (
+            <div key={m.i}>
+              <div className="text-cq-0.75 font-bold uppercase tracking-wide text-slide-ink">{m.label}</div>
+              <div className="mt-[0.2cqw] text-cq-1.25 leading-snug text-slide-body">{m.body || m.label}</div>
+            </div>
+          ))}
+        </div>
+        <div className="space-y-[1cqw] border-l border-slide-rule pl-[2cqw]">
+          {watches.map((w) => (
+            <div key={w.i} className="grid grid-cols-[5.5cqw_1fr] gap-[0.8cqw]">
+              <div className="h-fit bg-slide-sky px-[0.3cqw] py-[0.15cqw] text-center text-cq-0.75 font-bold text-slide-ink">{w.label.toUpperCase()}</div>
+              <div className="text-cq-1.25 leading-snug text-slide-ink">{w.body || w.label}{citeMarks(w)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  } else if (slide.layout === "recommendation") {
+    const name = (slide.subtitle || slide.title || "").replace(/^recommended policy:\s*/i, "");
+    body = (
+      <div className="flex h-full flex-col px-[4.6%] pt-[0.6cqw] pb-[1cqw]">
+        <div className="font-slide-serif text-cq-2.25 leading-tight text-slide-ink">{name}</div>
+        <div className="mt-[1cqw] grid min-h-0 flex-1 grid-cols-[1fr_16cqw] gap-[2cqw]">
+          <div className="space-y-[1cqw]">
+            {reasons.map((r, n) => (
+              <div key={r.i} className="grid grid-cols-[2.2cqw_1fr] gap-[0.8cqw]">
+                <div className="font-slide-serif text-cq-1.5 text-slide-muted">{String(n + 1).padStart(2, "0")}</div>
+                <div className="text-cq-1.25 leading-snug text-slide-ink">{r.body || r.label}{citeMarks(r)}</div>
+              </div>
+            ))}
+            {trade && (
+              <div className="pt-[0.4cqw]">
+                <div className="text-cq-0.75 font-bold uppercase tracking-wide text-slide-muted">Key trade-off</div>
+                <div className="mt-[0.2cqw] text-cq-1.25 leading-snug text-slide-body">{trade.body || trade.label}</div>
+              </div>
+            )}
+          </div>
+          <div className="h-fit bg-slide-ink px-[1.2cqw] py-[1cqw] text-white">
+            <div className="text-cq-0.75 font-bold uppercase tracking-wide text-slide-sky">Fit score</div>
+            <div className="font-slide-serif text-cq-3 leading-none">{scoreValue || "—"}</div>
+            <div className="mt-[0.4cqw] text-cq-1">Decision-support only</div>
+          </div>
+        </div>
+      </div>
+    );
+  } else {
+    body = twoCol ? (
+      <div className="flex h-full flex-col px-[3.75%] pt-[2.4cqw] pb-[1cqw]">
+        {slide.subtitle && <div className="mb-[1.2cqw] shrink-0 text-cq-1.25 leading-snug text-slide-muted">{slide.subtitle}</div>}
+        <div className="grid min-h-0 flex-1 grid-cols-2 divide-x divide-slide-rule">
+          <div className="min-h-0 pr-[2.2cqw]">{column(left, leftHeader)}</div>
+          <div className="min-h-0 pl-[2.2cqw]">{column(right, rightHeader)}</div>
+        </div>
+        {sources}
+      </div>
+    ) : (
+      <div className="absolute inset-x-[3%] top-[4.8%] bottom-[3.2%] flex flex-col border border-slide-rule bg-slide-bg px-[2.6cqw] pt-[1.9cqw] pb-[1.4cqw]">
+        {slide.subtitle && <div className="mb-[1.2cqw] shrink-0 text-cq-1.25 leading-snug text-slide-muted">{slide.subtitle}</div>}
+        <div className="min-h-0 flex-1">{column(left)}</div>
+        {sources}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("slide-frame select-none", !thumb && "select-text", className)} aria-label={`Slide ${index + 1} of ${total}: ${slide.title}`}>
@@ -189,46 +348,7 @@ export function SlideCanvas({ slide, index, total, disclaimer, refsByChunk = {},
       </header>
 
       {/* Body: between the header band and the footer rule */}
-      <div className={cn("absolute inset-x-0 top-[16%] bottom-[7%]", (!twoCol || map) && "bg-slide-canvas")}>
-        {map ? (
-          <div className="flex h-full flex-col px-[3.75%] pt-[1.6cqw] pb-[1cqw]">
-            {subtitle}
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-x-[1.2cqw] text-cq-0.75 font-bold uppercase tracking-wide text-slide-ocean">
-              <div>Client exposure</div>
-              <div />
-              <div>Stated in the brochure</div>
-            </div>
-            <div className="mt-[0.6cqw] grid min-h-0 flex-1 grid-cols-[1fr_auto_1fr] gap-x-[1.2cqw] gap-y-[0.7cqw]">
-              {Array.from({ length: mapRows }, (_, r) => (
-                <div key={r} className="contents">
-                  {mapCard(exposures[r], "exposure")}
-                  <div className="flex items-center text-slide-ocean">
-                    {exposures[r] && benefits[r] ? <span aria-hidden className="text-cq-1.75 leading-none">→</span> : null}
-                  </div>
-                  {mapCard(benefits[r], "benefit")}
-                </div>
-              ))}
-            </div>
-            {why && <div className="mt-[0.8cqw] shrink-0 bg-slide-ink px-[1.4cqw] py-[0.7cqw] text-cq-1.25 leading-snug font-semibold text-white">{why.b.text}</div>}
-            {sources}
-          </div>
-        ) : twoCol ? (
-          <div className="flex h-full flex-col px-[3.75%] pt-[2.4cqw] pb-[1cqw]">
-            {subtitle}
-            <div className="grid min-h-0 flex-1 grid-cols-2 divide-x divide-slide-rule">
-              <div className="min-h-0 pr-[2.2cqw]">{column(left, leftHeader)}</div>
-              <div className="min-h-0 pl-[2.2cqw]">{column(right, rightHeader)}</div>
-            </div>
-            {sources}
-          </div>
-        ) : (
-          <div className="absolute inset-x-[3%] top-[4.8%] bottom-[3.2%] flex flex-col border border-slide-rule bg-slide-bg px-[2.6cqw] pt-[1.9cqw] pb-[1.4cqw]">
-            {subtitle}
-            <div className="min-h-0 flex-1">{column(left)}</div>
-            {sources}
-          </div>
-        )}
-      </div>
+      <div className="absolute inset-x-0 top-[16%] bottom-[7%] overflow-hidden bg-slide-canvas">{body}</div>
 
       {/* Footer: rule at 7.1in, wordmark, disclaimer, copyright, page */}
       <footer title={disclaimer} className="absolute inset-x-0 bottom-0 flex h-[7%] items-center border-t border-slide-rule px-[4.6%] text-slide-ink">

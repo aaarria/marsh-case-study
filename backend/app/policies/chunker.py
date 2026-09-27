@@ -155,9 +155,10 @@ def _blocks_from_rows(row_text: str) -> list[_Block]:
 
 
 class PolicyChunker:
-    def __init__(self, profile: PolicyProfile, policy_name: str):
+    def __init__(self, profile: PolicyProfile, policy_name: str, source_document: str | None = None):
         self.profile = profile
         self.policy_name = policy_name
+        self.source_document = source_document
 
     # ---------- classification ----------
     def _classify(self, text: str, section: str | None, section_kind: str | None, default: ContentType) -> ContentType:
@@ -229,6 +230,8 @@ class PolicyChunker:
             chunk_id=f"{pid}:{cid}",
             policy_id=pid,
             policy_name=self.policy_name,
+            insurer_name=self.profile.insurer,
+            source_document=self.source_document,
             page_number=page,
             section=section,
             subsection=subsection,

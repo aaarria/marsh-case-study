@@ -4,10 +4,10 @@ fit = 100 * clip(0.60*coverage + 0.15*evidence_strength - 0.15*exclusion_risk - 
 Every component is reported with its weight, value, contribution and a plain-language explanation.
 This is a decision-support metric, not objective truth.
 
-Coverage is normalised over *every* scenario. A scenario the brochure says nothing about takes a
-neutral 0.5 (it is neither covered nor excluded) and is additionally penalised through `uncertainty`.
-Normalising over evaluated scenarios only would let a two-page marketing sheet that mentions six
-benefits score full coverage and beat a brochure that actually documents thirteen.
+A baseline scenario counts only when at least half the policies actually document it, so a longer
+brochure does not win by mentioning features the others never had a chance to be scored on.
+A scenario the advisor asked for always counts: silence there is a neutral 0.5 plus an uncertainty
+penalty, never a free point for the policy that happens to have more pages.
 """
 from __future__ import annotations
 
@@ -58,8 +58,28 @@ def score_policy(policy_id: str, scenarios: list[Scenario], outcomes: list[Scena
     return PolicyFitResult(policy_id=policy_id, score=score, components=components, explanation=explanation, evaluated_scenarios=len(evaluated), unknown_scenarios=len(unknown), confidence=confidence)
 
 
+def _ranking_scenarios(policy_ids: list[str], scenarios: list[Scenario], outcomes: list[ScenarioOutcome]) -> list[Scenario]:
+    """Drop baseline items only one brochure mentions. Keep anything the client asked for."""
+    ids = set(policy_ids)
+    needed = max(2, (len(policy_ids) + 1) // 2)
+    by_scenario: dict[str, list[ScenarioOutcome]] = {}
+    for outcome in outcomes:
+        if outcome.policy_id in ids:
+            by_scenario.setdefault(outcome.scenario_id, []).append(outcome)
+    kept = []
+    for scenario in scenarios:
+        rows = by_scenario.get(scenario.scenario_id, [])
+        documented = sum(1 for row in rows if row.value is not None)
+        if scenario.client_asked or documented >= needed:
+            kept.append(scenario)
+    return kept or list(scenarios)
+
+
 def score_all(policy_ids: list[str], scenarios: list[Scenario], outcomes: list[ScenarioOutcome], gaps: list[PolicyGap]) -> list[PolicyFitResult]:
-    results = [score_policy(pid, scenarios, outcomes, gaps) for pid in policy_ids]
+    comparable = _ranking_scenarios(policy_ids, scenarios, outcomes)
+    comparable_ids = {s.scenario_id for s in comparable}
+    outcomes = [o for o in outcomes if o.scenario_id in comparable_ids and o.policy_id in set(policy_ids)]
+    results = [score_policy(pid, comparable, outcomes, gaps) for pid in policy_ids]
     # Highest score wins. An exact tie breaks on policy id, not on catalog order
     # (HDFC is filed as "Policy A", so a stable sort would have preferred it).
     results.sort(key=lambda r: (-r.score, r.policy_id))

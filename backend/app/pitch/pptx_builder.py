@@ -131,6 +131,43 @@ def _parts(text: str) -> tuple[str, str]:
     return "", raw
 
 
+_GENERIC = {"TITLE", "EXPOSURE", "CARD", "BENEFIT", "ITEM", "POINT", "LABEL"}
+
+
+def _named(label: str, body: str) -> tuple[str, str]:
+    """A model often emits the placeholder word TITLE as the label. The real heading is the other half."""
+    if not label or label.upper() in _GENERIC:
+        return body, ""
+    if body.strip().lower() == label.strip().lower():
+        return label, ""
+    return label, body
+
+
+def _client_line(company: str, profile: list[tuple], subtitle: str | None) -> str:
+    if subtitle and len(subtitle.split()) >= 8:
+        return _short(subtitle, 220)
+    by = {label.upper(): body for _, _, label, body in profile}
+
+    def ok(value: str | None) -> str:
+        if not value or value.strip().lower() in {"unknown", "not established", "none", "n/a"}:
+            return ""
+        return value.strip().rstrip(".")
+
+    industry, scale, footprint = ok(by.get("INDUSTRY")), ok(by.get("SCALE")), ok(by.get("FOOTPRINT"))
+    bits: list[str] = []
+    if industry:
+        word = industry[0].lower() + industry[1:]
+        bits.append(word if word.startswith(("a ", "an ")) else f"a {word} business")
+    if scale:
+        bits.append(scale[0].lower() + scale[1:])
+    if footprint:
+        bits.append(footprint[0].lower() + footprint[1:])
+    if not bits:
+        return "Company facts are still thin. The points below are working assumptions for the medical programme."
+    sentence = f"{company.strip() or 'This client'} is " + ", ".join(bits)
+    return _short(sentence if sentence.endswith(".") else sentence + ".", 220)
+
+
 def _status_label(kind: str, urls: list[str]) -> str:
     if kind == "assumption":
         return "ASSUMPTION"
@@ -256,7 +293,7 @@ def _glance(slide, content: Slide, markers: dict[int, list[Reference]]):
     for i, b in enumerate(content.bullets):
         if b.kind not in {"company", "assumption"}:
             continue
-        label, body = _parts(b.text)
+        label, body = _named(*_parts(b.text))
         if label.upper() in named and len(profile) < 3:
             profile.append((i, b, label, body))
         elif len(cards) < 4:
@@ -265,14 +302,14 @@ def _glance(slide, content: Slide, markers: dict[int, list[Reference]]):
         for i, b in enumerate(content.bullets):
             if b.kind not in {"company", "assumption"}:
                 continue
-            label, body = _parts(b.text)
+            label, body = _named(*_parts(b.text))
             if any(i == item[0] for item in profile) or any(i == item[0] for item in cards):
                 continue
             if len(profile) < 3:
                 profile.append((i, b, label, body))
 
-    lead = content.subtitle or (profile[0][3] if profile else "")
-    _text(slide, MARGIN, Inches(1.6), Inches(6.3), Inches(1.5), _short(lead, 140), 20, INK, font=SERIF)
+    company = re.sub(r"(?i)\s+at a glance$", "", content.title or "").strip()
+    _text(slide, MARGIN, Inches(1.55), Inches(6.4), Inches(2.4), _client_line(company, profile, content.subtitle), 18, INK, font=SERIF)
 
     labels = ["INDUSTRY", "SCALE", "FOOTPRINT"]
     for n, item in enumerate(profile[:3]):
@@ -283,7 +320,8 @@ def _glance(slide, content: Slide, markers: dict[int, list[Reference]]):
         p = tb.text_frame.paragraphs[0]
         _run(p, _short(body or b.text, 90), 16, INK)
         _mark(p, markers.get(i, []), 16)
-        _text(slide, Inches(7.5), y + Inches(0.78), Inches(5.1), Inches(0.22), _status_label(b.kind, b.source_urls), 10, MIDNIGHT, bold=True)
+        if b.kind == "assumption":
+            _text(slide, Inches(7.5), y + Inches(0.78), Inches(5.1), Inches(0.22), "Assumption", 10, MUTED)
 
     if not cards:
         return
@@ -291,12 +329,14 @@ def _glance(slide, content: Slide, markers: dict[int, list[Reference]]):
     width = (W - 2 * MARGIN - Inches(0.28) * (len(cards[:4]) - 1)) / max(len(cards[:4]), 1)
     for n, (i, b, label, body) in enumerate(cards[:4]):
         x = MARGIN + n * (width + Inches(0.28))
+        heading, detail = _named(label, body)
         _rect(slide, x, Inches(5.25), width, Inches(0.08), BLUE)
-        _text(slide, x, Inches(5.42), width, Inches(0.28), _short((label or "Exposure").upper(), 28), 11, MIDNIGHT, bold=True)
-        tb = _textbox(slide, x, Inches(5.72), width, Inches(0.7))
-        p = tb.text_frame.paragraphs[0]
-        _run(p, _short(body or b.text, 90), 14, INK)
-        _mark(p, markers.get(i, []), 14)
+        _text(slide, x, Inches(5.42), width, Inches(0.55), _short(heading or "Exposure", 48), 14, MIDNIGHT, font=SERIF)
+        if detail:
+            tb = _textbox(slide, x, Inches(6.0), width, Inches(0.7))
+            p = tb.text_frame.paragraphs[0]
+            _run(p, _short(detail, 90), 12, INK)
+            _mark(p, markers.get(i, []), 12)
 
 
 def _journey(slide, content: Slide, markers: dict[int, list[Reference]], refs_by_chunk: dict[str, SourceRef]):
@@ -317,11 +357,11 @@ def _journey(slide, content: Slide, markers: dict[int, list[Reference]], refs_by
         exp = exposures[r] if r < len(exposures) else None
         ben = benefits[r] if r < len(benefits) else None
         if exp:
-            label, body = _parts(exp[1].text)
+            label, body = _named(*_parts(exp[1].text))
             _text(slide, xs[0], y, ws[0], Inches(0.85), _short(label or body, 42), 16, MIDNIGHT, font=SERIF)
             _text(slide, xs[1], y, ws[1], Inches(0.9), _short(body if label else "", 80) or "Identified for this client", 14, INK)
         if ben:
-            label, body = _parts(ben[1].text)
+            label, body = _named(*_parts(ben[1].text))
             tb = _textbox(slide, xs[2], y, ws[2], Inches(0.9))
             p = tb.text_frame.paragraphs[0]
             _run(p, _short(label or body, 70), 15, INK)

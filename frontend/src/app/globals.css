@@ -23,9 +23,12 @@
 
 :root {
   /* --- foundations ------------------------------------------------------- */
-  --base-hue: 250;           /* cool near-neutral, like #08090A / #F7F8F8 */
-  --base-chroma: 0.004;
-  --accent-hue: 200;         /* Marsh cyan #00ABC7: focus, links, active markers */
+  --base-hue: 258;           /* Marsh navy #002C77 */
+  --base-chroma: 0.04;
+  --accent-hue: 198;         /* Marsh cyan #00A8C7 */
+  --marsh-navy: #002c77;
+  --marsh-white: #ffffff;
+  --marsh-cream: #f7f4ef;
   --contrast: 1;             /* 1 = default; >1 = higher-contrast theme */
 
   /* --- type ---------------------------------------------------------------- */
@@ -53,49 +56,49 @@
   --dur-base: 180ms;
   --dur-slow: 320ms;
 
-  /* --- slide (the product; Marsh's template as measured from the brief; theme-independent) ---- */
-  --slide-bg: #f8f3ef;                   /* warm ivory, the Marsh page ground */
-  --slide-ink: #000e47;                   /* midnight: headlines and anchors */
-  --slide-body: #1c1a17;
-  --slide-muted: #6b6560;
-  --slide-rule: #e3dbd4;
-  --slide-canvas: #f8f3ef;
-  --slide-sky: #b6e8f4;                   /* light blue, used as a small highlight */
-  --slide-ocean: #000e47;
-  --slide-accent: #000e47;
-  --slide-accent-tint: #b6e8f4;
-  --slide-gold: #c4a35a;
-  --slide-hover: #f4f7fb;
+  /* --- slide: Marsh logo palette on the cream page ground from marsh.com ---- */
+  --slide-bg: #f7f4ef;
+  --slide-ink: var(--marsh-navy);
+  --slide-body: #1a2744;
+  --slide-muted: #5c6b80;
+  --slide-rule: #d7e3ea;
+  --slide-canvas: #f7f4ef;
+  --slide-sky: #e8eef6;
+  --slide-ocean: var(--marsh-navy);
+  --slide-accent: var(--marsh-navy);
+  --slide-accent-tint: #e8eef6;
+  --slide-gold: var(--marsh-white);
+  --slide-hover: #eef6f8;
   --font-slide-serif: "Georgia Pro", Georgia, "Times New Roman", serif;
   --font-slide-sans: Calibri, Carlito, "Segoe UI", var(--font-sans);
 }
 
 /* ---------------------------------------------------------------------------
-   DARK — Linear: #08090A canvas, surface ladder for depth, no drop shadows.
+   Dark chrome: Marsh navy #002C77 and white. No yellow, no cyan fills.
    --------------------------------------------------------------------------- */
 :root {
-  --canvas:   oklch(0.135 var(--base-chroma) var(--base-hue));
-  --panel:    oklch(0.165 var(--base-chroma) var(--base-hue));
-  --surface:  oklch(0.19 var(--base-chroma) var(--base-hue));
-  --raised:   oklch(0.225 var(--base-chroma) var(--base-hue));
-  --overlay:  oklch(0.245 var(--base-chroma) var(--base-hue));
-  --veil:     oklch(0.135 var(--base-chroma) var(--base-hue) / 0.8);
+  --canvas:   #000814;
+  --panel:    var(--marsh-navy);
+  --surface:  #001833;
+  --raised:   #002c77;
+  --overlay:  #001428;
+  --veil:     #000814cc;
 
-  --ink:      oklch(0.975 0.002 var(--base-hue));
-  --body:     oklch(0.86 0.006 var(--base-hue));
-  --ink-muted: oklch(0.63 0.008 var(--base-hue));
-  --quiet:    oklch(0.48 0.008 var(--base-hue));
+  --ink:      var(--marsh-white);
+  --body:     color-mix(in srgb, var(--marsh-white) 88%, transparent);
+  --ink-muted: color-mix(in srgb, var(--marsh-white) 72%, transparent);
+  --quiet:    color-mix(in srgb, var(--marsh-white) 52%, transparent);
 
-  --hairline:        oklch(1 0 0 / calc(0.08 * var(--contrast)));
-  --hairline-strong: oklch(1 0 0 / calc(0.12 * var(--contrast)));
-  --hairline-bright: oklch(1 0 0 / calc(0.2 * var(--contrast)));
+  --hairline:        color-mix(in srgb, var(--marsh-white) 12%, transparent);
+  --hairline-strong: color-mix(in srgb, var(--marsh-white) 22%, transparent);
+  --hairline-bright: color-mix(in srgb, var(--marsh-white) 45%, transparent);
 
-  --accent:      oklch(0.74 0.12 var(--accent-hue));
+  --accent:      var(--marsh-white);
 
   --ok:      oklch(0.72 0.16 150);  --ok-fg:      oklch(0.8 0.14 150);
   --warn:    oklch(0.8 0.15 80);    --warn-fg:    oklch(0.85 0.13 85);
   --danger:  oklch(0.68 0.19 25);   --danger-fg:  oklch(0.78 0.15 25);
-  --info:    oklch(0.52 0.12 230);  --info-fg:    oklch(0.78 0.08 220);
+  --info:    var(--marsh-white);  --info-fg:    var(--marsh-white);
   --neutral: oklch(0.6 0.008 var(--base-hue)); --neutral-fg: var(--ink-muted);
 
   /* depth comes from the ladder; shadows only add a hairline */
@@ -114,8 +117,8 @@
   --foreground: var(--ink);
   --popover: var(--overlay);
   --popover-foreground: var(--ink);
-  --primary: var(--ink);                 /* filled buttons invert: the brightest object */
-  --primary-foreground: var(--canvas);
+  --primary: var(--marsh-white);
+  --primary-foreground: var(--marsh-navy);
   --secondary: var(--raised);
   --secondary-foreground: var(--ink);
   --muted: var(--raised);
@@ -124,7 +127,7 @@
   --destructive: var(--danger);
   --border: var(--hairline);
   --input: var(--hairline-strong);
-  --ring: var(--accent);
+  --ring: var(--marsh-white);
 }
 
 /* ---------------------------------------------------------------------------
@@ -204,6 +207,9 @@
   --color-slide-accent-tint: var(--slide-accent-tint);
   --color-slide-ocean: var(--slide-ocean);
   --color-slide-hover: var(--slide-hover);
+  --color-marsh-navy: var(--marsh-navy);
+  --color-marsh-white: var(--marsh-white);
+  --color-marsh-cream: var(--marsh-cream);
   --font-slide-serif: var(--font-slide-serif);
   --font-slide-sans: var(--font-slide-sans);
 

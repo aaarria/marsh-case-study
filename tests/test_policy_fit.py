@@ -187,22 +187,28 @@ def test_tie_does_not_prefer_hdfc():
     assert fits[0].policy_id == "abhi_activ_one"
 
 
-def test_silence_does_not_beat_documented_coverage():
-    """A brochure that mentions few scenarios (all covered) must not outscore one that documents most of them."""
+def test_extra_pages_do_not_win_the_comparison():
+    """Features only the long brochure mentions are not in the ranking. A feature the client asked for still is."""
     from app.models.fit import Scenario, ScenarioOutcome
     from app.models.policy import SourceRef
     from app.policy_fit.scoring import score_all
 
-    scenarios = [Scenario(scenario_id=f"s{i}", exposure_id="e", title="t", description="d", feature_keys=["f"]) for i in range(21)]
+    shared = [Scenario(scenario_id=f"s{i}", exposure_id="e", title="t", description="d", feature_keys=["f"]) for i in range(4)]
+    only_long = [Scenario(scenario_id=f"x{i}", exposure_id="e", title="t", description="d", feature_keys=["f"]) for i in range(8)]
+    asked = Scenario(scenario_id="asked", exposure_id="e", title="Maternity", description="d", feature_keys=["maternity"], client_asked=True)
     src = SourceRef(policy_id="thin", chunk_id="c", page=1, source_text="x", retrieval_relevance=0.8)
+
+    def row(pid, scenario, status, value):
+        return ScenarioOutcome(scenario_id=scenario.scenario_id, policy_id=pid, status=status, rationale="", value=value, sources=[src.model_copy(update={"policy_id": pid})] if value is not None else [])
+
     outcomes = []
-    for i, sc in enumerate(scenarios):
-        # "thin": 6 covered, 15 not addressed at all
-        covered = i < 6
-        outcomes.append(ScenarioOutcome(scenario_id=sc.scenario_id, policy_id="thin", status=CoverageStatus.COVERED if covered else CoverageStatus.NOT_FOUND, rationale="", value=1.0 if covered else None, sources=[src] if covered else []))
-        # "full": 13 covered, 3 conditional, 3 add-on, 2 not addressed
-        st, val = (CoverageStatus.COVERED, 1.0) if i < 13 else (CoverageStatus.CONDITIONAL, 0.75) if i < 16 else (CoverageStatus.ADD_ON, 0.35) if i < 19 else (CoverageStatus.NOT_FOUND, None)
-        outcomes.append(ScenarioOutcome(scenario_id=sc.scenario_id, policy_id="full", status=st, rationale="", value=val, sources=[src.model_copy(update={"policy_id": "full"})] if val is not None else []))
-    fits = {f.policy_id: f for f in score_all(["thin", "full"], scenarios, outcomes, [])}
-    assert fits["full"].score > fits["thin"].score + 10
-    assert fits["thin"].confidence == "LOW" and fits["full"].confidence == "HIGH"
+    for sc in shared:
+        outcomes += [row("thin", sc, CoverageStatus.COVERED, 1.0), row("full", sc, CoverageStatus.COVERED, 1.0)]
+    for sc in only_long:
+        outcomes += [row("thin", sc, CoverageStatus.NOT_FOUND, None), row("full", sc, CoverageStatus.COVERED, 1.0)]
+    tied = {f.policy_id: f for f in score_all(["thin", "full"], shared + only_long, outcomes, [])}
+    assert abs(tied["full"].score - tied["thin"].score) < 5
+
+    outcomes += [row("thin", asked, CoverageStatus.NOT_FOUND, None), row("full", asked, CoverageStatus.COVERED, 1.0)]
+    asked_fits = {f.policy_id: f for f in score_all(["thin", "full"], shared + only_long + [asked], outcomes, [])}
+    assert asked_fits["full"].score > asked_fits["thin"].score

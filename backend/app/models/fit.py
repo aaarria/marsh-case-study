@@ -13,6 +13,7 @@ class Scenario(BaseModel):
     description: str
     feature_keys: list[str]
     weight: float = 1.0
+    client_asked: bool = False  # advisor priority: silence counts. A generic baseline item does not, unless several brochures document it.
 
 
 class ScenarioOutcome(BaseModel):

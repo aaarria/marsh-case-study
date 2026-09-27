@@ -69,6 +69,7 @@ def build_scenarios(exposures: list[Exposure], max_per_exposure: int = 3) -> lis
                     description=f"{desc} (tests: {FEATURE_LABELS.get(k, k)})",
                     feature_keys=[k],
                     weight=max(0.1, float(e.priority)) * (1.0 if e.status.value == "FACT" else 0.85 if e.status.value == "INFERENCE" else 0.7),
+                    client_asked=float(e.priority) >= 1.5,
                 )
             )
     return scenarios

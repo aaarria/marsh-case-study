@@ -3,9 +3,10 @@
 Retrieval is deterministic and policy-scoped; the LLM only turns the retrieved passages into a
 validated `FeatureFact`. Evidence ids are echoed back and mapped to SourceRefs deterministically.
 A status other than NOT_FOUND without cited evidence is downgraded (never fabricate).
+A quoted span must exist inside a retrieved chunk; page numbers come from chunk metadata.
 
 A heuristic extractor exists for offline mode/tests: it only reads table rows / typed chunks and
-marks everything else UNKNOWN.
+marks everything else NOT_FOUND.
 """
 from __future__ import annotations
 
@@ -16,10 +17,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from app.config import get_settings
-from app.models.policy import Chunk, ContentType, CoverageStatus, FeatureFact, PolicyExtractionResult, SourceRef
+from app.models.policy import Chunk, ContentType, CoverageStatus, FeatureFact, PolicyDocument, PolicyExtractionResult, SourceRef
+from app.policies.evidence_contract import (
+    EVIDENCE_SCHEMA_VERSION,
+    prompt_hash,
+    retrieval_method_for,
+    stamp_fact,
+    validate_extraction,
+)
 from app.policies.features import FEATURES, FEATURE_BY_KEY, FeatureSpec
 from app.rag.metadata_store import SQLiteMetadataStore
 from app.rag.retriever import HybridRetriever, PolicyEvidence, get_retriever
@@ -32,20 +40,23 @@ EXTRACTION_SYSTEM = """You are a meticulous insurance policy analyst working for
 You read ONLY the numbered evidence passages from ONE insurer's product brochure and fill a structured record for ONE feature.
 Rules:
 - Use only the evidence. Never use outside knowledge about the insurer or product.
-- If the evidence does not establish a field, set it to null. If the evidence does not address the feature at all, set coverage_status = "NOT_FOUND". NOT_FOUND is not EXCLUDED.
+- If the evidence does not establish a field, set it to null. If the evidence does not address the feature at all, set coverage_status = "NOT_FOUND". NOT_FOUND is not EXCLUDED. NOT_FOUND is not COVERED. Never infer "not mentioned, therefore excluded".
 - Set coverage_status = "EXCLUDED" only when the evidence explicitly lists the feature as an exclusion / not covered.
-- Set coverage_status = "ADD_ON" when the benefit exists only as an optional / add-on / rider cover at extra premium.
+- Set coverage_status = "ADD_ON" when the benefit exists only as an optional / add-on / rider cover at extra premium. ADD_ON is not a weak form of COVERED.
 - Set "CONDITIONAL" when coverage depends on conditions (waiting period, minimum hours, network-only, sum-insured band, variant-only).
 - Set "PARTIALLY_COVERED" when coverage is capped well below the sum insured or limited to a subset.
 - Quote numbers exactly as written in the evidence (e.g. "INR 2,50,000", "36 months", "20%").
+- "quote" must be a verbatim substring of one cited evidence passage. Never invent a quote or a page number.
 - List every condition / footnote that changes the meaning of the benefit.
-- evidence_ids must list ONLY the passage ids you actually relied on.
+- evidence_ids must list ONLY the passage ids you actually relied on (E1, E2, ...). Do not invent ids.
 - Do not write explanations or reasoning; fill the fields only."""
+
+EXTRACTION_PROMPT_VERSION = prompt_hash(EXTRACTION_SYSTEM)
 
 
 class FeatureExtraction(BaseModel):
     coverage_status: Literal["COVERED", "PARTIALLY_COVERED", "CONDITIONAL", "EXCLUDED", "ADD_ON", "NOT_FOUND"]
-    value: str | None = Field(description="One-sentence factual summary of what the brochure says about this feature, or null")
+    value: str | None = Field(default=None, description="One-sentence factual summary of what the brochure says about this feature, or null")
     limit: str | None = None
     waiting_period: str | None = None
     deductible: str | None = None
@@ -54,6 +65,7 @@ class FeatureExtraction(BaseModel):
     conditions: list[str] = Field(default_factory=list)
     is_add_on: bool = False
     variant_scope: str | None = Field(default=None, description="If the benefit applies to a specific plan variant only, name it; else null")
+    quote: str | None = Field(default=None, description="Verbatim substring copied from a cited evidence passage")
     evidence_ids: list[str] = Field(default_factory=list, description="Passage ids like E1, E3 that support the record")
     confidence: float = Field(ge=0, le=1, description="Confidence that the record faithfully reflects the evidence")
 
@@ -95,37 +107,76 @@ def _collect_evidence(retriever: HybridRetriever, spec: FeatureSpec, policy_id: 
     return items, ev
 
 
-def _to_fact(policy_id: str, feature: str, ext: FeatureExtraction, items: list[tuple[str, Chunk, float | None]], ev: PolicyEvidence) -> FeatureFact:
-    by_id = {eid: (ch, sc) for eid, ch, sc in items}
-    sources: list[SourceRef] = []
-    for eid in ext.evidence_ids:
-        if eid in by_id:
-            ch, sc = by_id[eid]
-            sources.append(SourceRef.from_chunk(ch, sc))
+def _to_fact(
+    policy_id: str,
+    feature: str,
+    ext: FeatureExtraction,
+    items: list[tuple[str, Chunk, float | None]],
+    ev: PolicyEvidence,
+    *,
+    spec: FeatureSpec | None = None,
+    doc: PolicyDocument | None = None,
+    prompt_version: str = EXTRACTION_PROMPT_VERSION,
+    model: str | None = None,
+) -> FeatureFact:
     status = CoverageStatus(ext.coverage_status)
-    notes = None
-    if status != CoverageStatus.NOT_FOUND and not sources:
-        notes = "Downgraded to NOT_FOUND: extraction cited no evidence passages."
-        status = CoverageStatus.NOT_FOUND
+    status, cited, original_quote, notes = validate_extraction(
+        policy_id,
+        feature,
+        status,
+        ext.evidence_ids,
+        ext.quote,
+        items,
+        feature_keywords=spec.keywords if spec else (),
+    )
+    sources: list[SourceRef] = []
+    methods: list[str] = []
+    for eid, ch, sc in cited:
+        method = retrieval_method_for(None, None, False)
+        for r in ev.results:
+            if r.chunk.chunk_id == ch.chunk_id:
+                method = retrieval_method_for(r.bm25_rank, r.dense_rank, False)
+                break
+        methods.append(method)
+        sources.append(SourceRef.from_chunk(ch, sc, retrieval_method=method))
+        if doc:
+            sources[-1].insurer_name = sources[-1].insurer_name or doc.insurer
+            sources[-1].source_document = sources[-1].source_document or doc.file_name
+            sources[-1].product_name = sources[-1].product_name or doc.policy_name
     if status == CoverageStatus.NOT_FOUND:
         ext.value, ext.limit, ext.waiting_period, ext.deductible, ext.copay = None, None, None, None, None
+        original_quote = None
+        sources = []
     if ext.is_add_on and status in {CoverageStatus.COVERED, CoverageStatus.CONDITIONAL, CoverageStatus.PARTIALLY_COVERED}:
         status = CoverageStatus.ADD_ON
-    return FeatureFact(
+    if status == CoverageStatus.ADD_ON:
+        ext.is_add_on = True
+    fact = FeatureFact(
         policy_id=policy_id,
         feature=feature,
         coverage_status=status,
-        value=ext.value,
-        limit=ext.limit,
-        waiting_period=ext.waiting_period,
-        deductible=ext.deductible,
-        copay=ext.copay,
-        exclusions=ext.exclusions,
-        conditions=ext.conditions,
+        value=ext.value if status != CoverageStatus.NOT_FOUND else None,
+        limit=ext.limit if status != CoverageStatus.NOT_FOUND else None,
+        waiting_period=ext.waiting_period if status != CoverageStatus.NOT_FOUND else None,
+        deductible=ext.deductible if status != CoverageStatus.NOT_FOUND else None,
+        copay=ext.copay if status != CoverageStatus.NOT_FOUND else None,
+        eligibility=ext.variant_scope,
+        sublimit=ext.limit if status == CoverageStatus.PARTIALLY_COVERED else None,
+        exclusions=ext.exclusions if status != CoverageStatus.NOT_FOUND else [],
+        conditions=ext.conditions if status != CoverageStatus.NOT_FOUND else [],
         is_add_on=ext.is_add_on or status == CoverageStatus.ADD_ON,
         variant_scope=ext.variant_scope,
+        original_quote=original_quote,
         sources=sources,
         notes=notes,
+    )
+    return stamp_fact(
+        fact,
+        doc=doc,
+        prompt_version=prompt_version,
+        model=model,
+        retrieval_method=methods[0] if methods else None,
+        evidence_confidence=ext.confidence,
     )
 
 
@@ -164,17 +215,17 @@ class HeuristicExtractor:
             elif ch.content_type in {ContentType.CLAUSE, ContentType.LIST_ITEM} and hit_text and 20 < len(ch.source_text) < 320 and clause_hit is None:
                 clause_hit = (eid, ch)
         if excl:
-            return FeatureExtraction(coverage_status="EXCLUDED", value=f"Listed under exclusions: {excl[1].source_text}", exclusions=[excl[1].source_text], evidence_ids=[excl[0]], confidence=0.6)
+            return FeatureExtraction(coverage_status="EXCLUDED", value=f"Listed under exclusions: {excl[1].source_text}", quote=excl[1].source_text, exclusions=[excl[1].source_text], evidence_ids=[excl[0]], confidence=0.6)
         pick = best_row or row_text_hit
         if pick:
             text = pick[1].source_text
             value = text.split(":", 1)[1].strip() if ":" in text else text
             status = "CONDITIONAL" if pick[1].footnote_refs else "COVERED"
-            return FeatureExtraction(coverage_status=status, value=text, limit=value if re.search(r"\d", value) else None, evidence_ids=[pick[0]], confidence=0.55 if pick is best_row else 0.45)
+            return FeatureExtraction(coverage_status=status, value=text, limit=value if re.search(r"\d", value) else None, quote=text, evidence_ids=[pick[0]], confidence=0.55 if pick is best_row else 0.45)
         if addon:
-            return FeatureExtraction(coverage_status="ADD_ON", value=addon[1].source_text, is_add_on=True, evidence_ids=[addon[0]], confidence=0.5)
+            return FeatureExtraction(coverage_status="ADD_ON", value=addon[1].source_text, is_add_on=True, quote=addon[1].source_text, evidence_ids=[addon[0]], confidence=0.5)
         if clause_hit:
-            return FeatureExtraction(coverage_status="CONDITIONAL" if clause_hit[1].footnote_refs else "COVERED", value=clause_hit[1].source_text, evidence_ids=[clause_hit[0]], confidence=0.4)
+            return FeatureExtraction(coverage_status="CONDITIONAL" if clause_hit[1].footnote_refs else "COVERED", value=clause_hit[1].source_text, quote=clause_hit[1].source_text, evidence_ids=[clause_hit[0]], confidence=0.4)
         return FeatureExtraction(coverage_status="NOT_FOUND", value=None, evidence_ids=[], confidence=0.3)
 
 
@@ -184,22 +235,37 @@ class PolicyFactExtractor:
         self.llm = llm or get_llm()
         self.store = store or self.retriever.store
         self.heuristic = HeuristicExtractor()
+        self._docs: dict[str, PolicyDocument] = {p.policy_id: p for p in self.store.list_policies()}
 
-    def _cache_key(self, policy_id: str, feature: str, items: list[tuple[str, Chunk, float | None]]) -> str:
+    def _cache_key(self, policy_id: str, feature: str, items: list[tuple[str, Chunk, float | None]], prompt_version: str | None = None) -> str:
         ids = ",".join(ch.chunk_id for _, ch, _ in items)
-        return hashlib.sha1(f"{policy_id}|{feature}|{ids}|{self.llm.model if self.llm.available else 'heuristic'}".encode()).hexdigest()
+        doc = self._docs.get(policy_id)
+        doc_id = f"{(doc.document_hash if doc else None) or (doc.file_name if doc else policy_id)}:{(doc.pages if doc else 0)}"
+        model = self.llm.model if self.llm.available else "heuristic"
+        pv = prompt_version or EXTRACTION_PROMPT_VERSION
+        return hashlib.sha1(
+            f"{policy_id}|{doc_id}|{feature}|{ids}|{pv}|{EVIDENCE_SCHEMA_VERSION}|{model}".encode()
+        ).hexdigest()
 
     def extract_feature(self, policy_id: str, feature: str, use_cache: bool = True) -> FeatureFact:
         spec = FEATURE_BY_KEY[feature]
+        doc = self._docs.get(policy_id)
         items, ev = _collect_evidence(self.retriever, spec, policy_id)
         if not items:
-            return FeatureFact(policy_id=policy_id, feature=feature, coverage_status=CoverageStatus.NOT_FOUND, notes="No evidence retrieved for this policy/feature")
+            fact = FeatureFact(
+                policy_id=policy_id,
+                feature=feature,
+                coverage_status=CoverageStatus.NOT_FOUND,
+                notes="No evidence retrieved for this policy/feature",
+            )
+            return stamp_fact(fact, doc=doc, prompt_version=EXTRACTION_PROMPT_VERSION, model=self.llm.model if self.llm.available else "heuristic")
         key = self._cache_key(policy_id, feature, items)
         if use_cache:
             cached = self.store.cache_get("extraction", key)
             if cached:
                 return FeatureFact.model_validate(cached)
         mode = "llm"
+        ext: FeatureExtraction | None = None
         if self.llm.available:
             user = (
                 f"POLICY: {items[0][1].policy_name} (policy_id={policy_id})\n"
@@ -208,14 +274,33 @@ class PolicyFactExtractor:
                 f"EVIDENCE PASSAGES:\n{_format_evidence(items)}"
             )
             try:
-                ext = self.llm.structured(EXTRACTION_SYSTEM, user, FeatureExtraction, purpose="policy_extraction")
+                raw = self.llm.structured(EXTRACTION_SYSTEM, user, FeatureExtraction, purpose="policy_extraction")
+                ext = raw if isinstance(raw, FeatureExtraction) else FeatureExtraction.model_validate(raw)
             except LLMUnavailable:
                 ext = self.heuristic.extract(spec, policy_id, items, ev)
                 mode = "heuristic"
+            except (ValidationError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                fact = FeatureFact(
+                    policy_id=policy_id,
+                    feature=feature,
+                    coverage_status=CoverageStatus.UNKNOWN,
+                    notes=f"Malformed extraction JSON: {exc}",
+                )
+                return stamp_fact(fact, doc=doc, prompt_version=EXTRACTION_PROMPT_VERSION, model=self.llm.model)
         else:
             ext = self.heuristic.extract(spec, policy_id, items, ev)
             mode = "heuristic"
-        fact = _to_fact(policy_id, feature, ext, items, ev)
+        fact = _to_fact(
+            policy_id,
+            feature,
+            ext,
+            items,
+            ev,
+            spec=spec,
+            doc=doc,
+            prompt_version=EXTRACTION_PROMPT_VERSION,
+            model=self.llm.model if self.llm.available else "heuristic",
+        )
         if mode == "heuristic":
             fact.notes = (fact.notes + " " if fact.notes else "") + "Extracted by offline heuristic (no LLM); treat as provisional."
         if use_cache:

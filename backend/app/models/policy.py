@@ -29,9 +29,20 @@ class CoverageStatus(str, Enum):
     PARTIALLY_COVERED = "PARTIALLY_COVERED"
     CONDITIONAL = "CONDITIONAL"
     EXCLUDED = "EXCLUDED"
-    ADD_ON = "ADD_ON"  # available only as optional/add-on cover at extra premium
+    ADD_ON = "ADD_ON"  # availability mode: optional/add-on at extra premium, not a weak COVERED
     NOT_FOUND = "NOT_FOUND"
     UNKNOWN = "UNKNOWN"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
+class AvailabilityMode(str, Enum):
+    """How the benefit is offered. Distinct from retrieval relevance and from fit score."""
+
+    BASE_POLICY = "base_policy"
+    OPTIONAL_ADD_ON = "optional_add_on"
+    EXCLUDED = "excluded"
+    NOT_FOUND = "not_found"
+    CONDITIONAL = "conditional"
 
 
 class PolicyDocument(BaseModel):
@@ -46,12 +57,15 @@ class PolicyDocument(BaseModel):
     page_flags: dict[int, str] = Field(default_factory=dict)  # e.g. {1: "image_only"}
     short_label: str = ""  # e.g. "Policy A"
     is_group_policy: str = "NOT_FOUND"  # brochures do not state group terms
+    document_hash: str | None = None  # sha256 prefix of the source PDF bytes
 
 
 class Chunk(BaseModel):
     chunk_id: str
     policy_id: str
     policy_name: str
+    insurer_name: str | None = None
+    source_document: str | None = None
     page_number: int
     section: str | None = None
     subsection: str | None = None
@@ -72,6 +86,9 @@ class Chunk(BaseModel):
 class SourceRef(BaseModel):
     policy_id: str
     policy_name: str | None = None
+    insurer_name: str | None = None
+    product_name: str | None = None
+    source_document: str | None = None
     chunk_id: str
     page: int
     section: str | None = None
@@ -81,21 +98,29 @@ class SourceRef(BaseModel):
     retrieval_relevance: float | None = Field(
         default=None, description="Retrieval relevance signal (rerank / fused score), NOT factual accuracy"
     )
+    retrieval_method: str | None = None
+    retrieval_score: float | None = None
     linked_conditions: list[str] = Field(default_factory=list, description="chunk_ids of footnotes/conditions")
 
     @classmethod
-    def from_chunk(cls, c: Chunk, relevance: float | None = None) -> "SourceRef":
+    def from_chunk(cls, c: Chunk, relevance: float | None = None, retrieval_method: str | None = None) -> "SourceRef":
         """The one place a brochure chunk becomes a citation. `relevance` is a retrieval signal, never accuracy."""
+        score = round(relevance, 4) if relevance is not None else None
         return cls(
             policy_id=c.policy_id,
             policy_name=c.policy_name,
+            insurer_name=c.insurer_name,
+            product_name=c.policy_name,
+            source_document=c.source_document,
             chunk_id=c.chunk_id,
             page=c.page_number,
             section=c.section,
             clause=c.clause,
             content_type=c.content_type.value,
             source_text=c.source_text,
-            retrieval_relevance=round(relevance, 4) if relevance is not None else None,
+            retrieval_relevance=score,
+            retrieval_score=score,
+            retrieval_method=retrieval_method,
             linked_conditions=list(c.footnote_refs),
         )
 
@@ -115,15 +140,39 @@ class FeatureFact(BaseModel):
     policy_id: str
     feature: str
     coverage_status: CoverageStatus = CoverageStatus.NOT_FOUND
+    availability_mode: AvailabilityMode = AvailabilityMode.NOT_FOUND
     value: str | None = None  # concise human-readable summary of what the policy says
     limit: str | None = None
+    limit_numeric: float | None = None
+    limit_original_text: str | None = None
+    unit: str | None = None
     waiting_period: str | None = None
+    waiting_period_days: float | None = None
+    waiting_period_months: float | None = None
     deductible: str | None = None
+    deductible_amount: float | None = None
     copay: str | None = None
+    copay_percent: float | None = None
+    eligibility: str | None = None
+    sublimit: str | None = None
     exclusions: list[str] = Field(default_factory=list)
     conditions: list[str] = Field(default_factory=list)
     is_add_on: bool = False
+    add_on_required: bool = False
     variant_scope: str | None = None  # e.g. "VIP+ only"
+    original_quote: str | None = None
+    source_page: int | None = None
+    source_section: str | None = None
+    source_chunk_id: str | None = None
+    evidence_confidence: float | None = None
+    retrieval_method: str | None = None
+    insurer_name: str | None = None
+    product_name: str | None = None
+    source_document: str | None = None
+    extracted_at: str | None = None
+    schema_version: str | None = None
+    prompt_version: str | None = None
+    model: str | None = None
     sources: list[SourceRef] = Field(default_factory=list)
     notes: str | None = None
 

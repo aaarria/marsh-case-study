@@ -58,7 +58,7 @@ def parsed_docs(policies, settings):
 def chunked(parsed_docs):
     from app.policies.chunker import PolicyChunker
 
-    return {pid: PolicyChunker(prof, doc.policy_name).chunk_document(parsed) for pid, (prof, doc, parsed) in parsed_docs.items()}
+    return {pid: PolicyChunker(prof, doc.policy_name, source_document=doc.file_name).chunk_document(parsed) for pid, (prof, doc, parsed) in parsed_docs.items()}
 
 
 @pytest.fixture(scope="session")

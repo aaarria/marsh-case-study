@@ -17,6 +17,8 @@ def test_llm_extraction_maps_evidence_ids_to_sources(retriever):
     assert fact.coverage_status == CoverageStatus.COVERED
     assert fact.sources and fact.sources[0].policy_id == "niva_reassure_2"
     assert fact.sources[0].page == 2 and fact.sources[0].chunk_id.startswith("niva_reassure_2:")
+    assert fact.original_quote
+    assert fact.original_quote in fact.sources[0].source_text or fact.original_quote.lower() in fact.sources[0].source_text.lower()
 
 
 def test_status_without_evidence_is_downgraded_to_not_found(retriever):

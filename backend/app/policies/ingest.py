@@ -44,7 +44,8 @@ def ingest_policies(force_reparse: bool = False, embedding_provider: str | None 
         parsed = parse_pdf(pdf_path, profile, use_cache=not force_reparse)
         doc.pages = parsed.page_count
         doc.page_flags = parsed.flags()
-        chunks = PolicyChunker(profile, doc.policy_name).chunk_document(parsed)
+        doc.document_hash = parsed.file_hash
+        chunks = PolicyChunker(profile, doc.policy_name, source_document=doc.file_name).chunk_document(parsed)
         if not chunks:
             raise RuntimeError(f"Chunking produced no chunks for {doc.policy_name}")
         docs.append(doc)
