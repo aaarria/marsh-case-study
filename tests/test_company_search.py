@@ -72,6 +72,17 @@ def _profile(**kwargs):
     return LLMService(mock_handler=handler), handler
 
 
+def test_model_failure_keeps_the_pages_search_already_found():
+    def handler(*_args):
+        raise RuntimeError("model rejected the profile")
+
+    source = WebSource(url="https://www.bmw.in/en/index.html", title="BMW India", snippet="BMW Group manufactures premium automobiles and motorcycles and employs people across India.", accessible=True)
+    profile = research_company(ClientIntake(company_name="BMW"), llm=LLMService(mock_handler=handler), search=_Search(sources=[source]))
+    assert profile.research_status == "RESEARCH_COMPLETE"
+    assert profile.overview and "premium automobiles" in profile.overview
+    assert any(fact.kind == FactKind.FACT and fact.sources and fact.sources[0].url == source.url for fact in profile.facts)
+
+
 def test_name_variants_are_bounded_and_do_not_search_a_one_word_residue():
     assert alternate_name("ABC Pvt Ltd") == "ABC Private Limited"
     assert alternate_name("ABC Private Limited") == "ABC Pvt Ltd"

@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
     gemini_model: str = Field(default=DEFAULT_GEMINI_MODEL, alias="GEMINI_MODEL")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
-    groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
+    groq_model: str = Field(default="openai/gpt-oss-20b", alias="GROQ_MODEL")
     # Gemini 3.x models think by default; "low" keeps latency and free-tier token use down.
     # Allowed: minimal | low | medium | high | default (leave the model default).
     gemini_thinking_level: str = Field(default="low", alias="GEMINI_THINKING_LEVEL")

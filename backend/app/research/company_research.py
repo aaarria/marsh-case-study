@@ -179,6 +179,37 @@ def _advisor_profile(name: str, intake: ClientIntake, status: str, note: str) ->
     )
 
 
+def _profile_from_snippets(name: str, intake: ClientIntake, sources: list[WebSource], cache_prefix: str) -> CompanyProfile:
+    """Keep the pages search already found when the model cannot format a profile."""
+    facts = _advisor_facts(intake)
+    for index, source in enumerate(sources):
+        sentence = re.split(r"(?<=[.!?])\s", " ".join((source.snippet or "").split()))[0].strip()[:320]
+        if len(sentence) < 40:
+            continue
+        facts.append(ClientFact(
+            fact_id=stable_id(name, "overview", sentence, str(index)),
+            field="overview",
+            text=sentence,
+            kind=FactKind.FACT,
+            sources=[source],
+            confidence=0.55,
+        ))
+    facts = _fill_unknowns(name, facts)
+    web = _web_facts(facts)
+    status, note = _status_note(sources, [], None, web)
+    return CompanyProfile(
+        company_name=name,
+        overview=_supported_text(facts, "overview"),
+        industry=intake.industry or _supported_text(facts, "industry"),
+        size=(f"{intake.employee_count:,} employees (advisor input)" if intake.employee_count else _supported_text(facts, "size")),
+        geography=intake.geography or _supported_text(facts, "geography"),
+        workforce=_supported_text(facts, "workforce") if web else None,
+        facts=facts,
+        research_status=status,
+        research_note=(cache_prefix + note).strip(),
+    )
+
+
 def _provider_note(failures: list[str]) -> str:
     text = " ".join(failures).lower()
     bits: list[str] = []
@@ -373,6 +404,8 @@ def research_company(intake: ClientIntake, llm: LLMService | None = None, search
         raise
     except Exception as exc:
         log.error("Company research LLM failed: %s", exc)
+        if usable:
+            return _profile_from_snippets(name, intake, usable, cache_prefix)
         return _advisor_profile(name, intake, RESEARCH_PARTIAL, f"{PARTIAL_NOTE} The profile could not be written from the sources.")
 
     facts: list[ClientFact] = _advisor_facts(intake)
