@@ -11,10 +11,12 @@ chain-of-thought to callers (schemas only include final fields; thinking is not 
 """
 from __future__ import annotations
 
+import json
 import re
 import time
+import types
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -139,7 +141,11 @@ def _json_text(raw: str) -> str:
 
 
 def _groq_schema(schema: type[BaseModel]) -> dict:
-    """Pydantic JSON schema with $refs inlined. Groq rejects schemas that still contain $defs."""
+    """Pydantic JSON schema Groq will accept.
+
+    Groq rejects ``anyOf`` null unions and ``$defs``. Optional strings become plain strings,
+    and every object lists all of its properties as required.
+    """
     raw = schema.model_json_schema()
     defs = raw.get("$defs") or {}
 
@@ -151,13 +157,79 @@ def _groq_schema(schema: type[BaseModel]) -> dict:
         if "$ref" in node:
             name = str(node["$ref"]).rsplit("/", 1)[-1]
             return resolve(defs.get(name, {}))
-        out = {key: resolve(value) for key, value in node.items() if key not in {"title", "$defs"}}
+        out = {key: resolve(value) for key, value in node.items() if key not in {"title", "$defs", "minimum", "maximum"}}
+        options = out.get("anyOf") or out.get("oneOf")
+        if isinstance(options, list):
+            kept = [item for item in options if isinstance(item, dict) and item.get("type") != "null"]
+            if len(kept) == 1:
+                merged = dict(kept[0])
+                for key, value in out.items():
+                    if key not in {"anyOf", "oneOf"}:
+                        merged.setdefault(key, value)
+                out = merged
         if out.get("type") == "object":
+            props = out.get("properties") or {}
             out["additionalProperties"] = False
+            if props:
+                out["required"] = list(props)
         return out
 
     resolved = resolve(raw)
     return resolved if isinstance(resolved, dict) else {"type": "object", "additionalProperties": False}
+
+
+def _relax_payload(data: Any) -> Any:
+    """Make a model JSON object validate when a field is missing, null, or cased differently."""
+    if isinstance(data, list):
+        return [_relax_payload(item) for item in data]
+    if not isinstance(data, dict):
+        return data
+    out = {key: _relax_payload(value) for key, value in data.items()}
+    if isinstance(out.get("kind"), str):
+        out["kind"] = out["kind"].strip().upper()
+    if "confidence" in out:
+        try:
+            out["confidence"] = max(0.0, min(1.0, float(out["confidence"])))
+        except (TypeError, ValueError):
+            out["confidence"] = 0.5
+    if isinstance(out.get("source_ids"), str):
+        out["source_ids"] = [out["source_ids"]]
+    for key in ("business_characteristics", "key_risks", "facts", "source_ids"):
+        if key in out and out[key] is None:
+            out[key] = []
+    if isinstance(out.get("facts"), list):
+        kept = []
+        for item in out["facts"]:
+            if not isinstance(item, dict) or not item.get("field") or not str(item.get("text") or "").strip() or not item.get("kind"):
+                continue
+            item.setdefault("confidence", 0.5)
+            item.setdefault("source_ids", [])
+            kept.append(item)
+        out["facts"] = kept
+    return out
+
+
+def _allows_none(annotation: Any) -> bool:
+    if annotation is type(None):
+        return True
+    origin = get_origin(annotation)
+    if origin in {types.UnionType}:
+        return any(_allows_none(arg) for arg in get_args(annotation))
+    args = get_args(annotation)
+    return any(arg is type(None) for arg in args)
+
+
+def _parse_structured(schema: type[BaseModel], raw: str) -> BaseModel:
+    text = _json_text(raw)
+    start, end = text.find("{"), text.rfind("}")
+    if start >= 0 and end > start:
+        text = text[start : end + 1]
+    data = _relax_payload(json.loads(text))
+    if isinstance(data, dict):
+        for name, info in schema.model_fields.items():
+            if name not in data and _allows_none(info.annotation):
+                data[name] = None
+    return schema.model_validate(data)
 
 
 def _thinking_config(model: str, level: str):
@@ -254,8 +326,7 @@ class LLMService:
                 "messages": messages,
                 "temperature": max(0.0, min(1.0, temperature)),
             }
-            if max_tokens:
-                body["max_tokens"] = max_tokens
+            body["max_tokens"] = max_tokens or (4096 if schema is not None else 1200)
             if fmt is not None:
                 body["response_format"] = fmt
             attempt = 0
@@ -299,12 +370,13 @@ class LLMService:
                 if resp.status_code >= 400:
                     raise LLMError(f"Groq call failed ({resp.status_code}) for {purpose}: {resp.text[:300]}")
                 data = resp.json()
-                raw = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+                message = ((data.get("choices") or [{}])[0].get("message") or {})
+                raw = message.get("content") or message.get("reasoning") or ""
                 log.info("LLM %s [%s] %.1fs", purpose, model, time.time() - t0)
                 if schema is None:
                     return raw
                 try:
-                    return schema.model_validate_json(_json_text(raw))
+                    return _parse_structured(schema, raw)
                 except Exception as exc:
                     last = str(exc)
                     if fmt and fmt.get("type") == "json_schema":

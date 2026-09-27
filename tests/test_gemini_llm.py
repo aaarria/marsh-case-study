@@ -1,6 +1,8 @@
 """Gemini LLM service: quota classification, no-model-substitution guarantee, offline behaviour (no network)."""
 from __future__ import annotations
 
+import json
+
 import pytest
 from pydantic import BaseModel
 
@@ -37,6 +39,23 @@ def test_minute_quota_uses_retry_delay():
 def test_unknown_payload_defaults_to_minute_scope():
     q = classify_quota_error(None, "m")
     assert q.scope == "minute" and q.retry_after == 60.0
+
+
+def test_groq_schema_drops_null_unions_and_still_parses_a_profile():
+    from app.research.company_research import ProfileOut
+    from app.services.llm import _groq_schema, _parse_structured
+
+    schema = _groq_schema(ProfileOut)
+    assert "anyOf" not in json.dumps(schema)
+    assert schema["properties"]["overview"]["type"] == "string"
+    parsed = _parse_structured(ProfileOut, """```json
+    {"overview":"Car maker","industry":null,"facts":[{"field":"industry","text":"Automotive","kind":"fact","source_ids":"S1","confidence":2}]}
+    ```""")
+    assert parsed.overview == "Car maker"
+    assert parsed.facts[0].kind == "FACT"
+    assert parsed.facts[0].source_ids == ["S1"]
+    assert parsed.facts[0].confidence == 1.0
+    assert parsed.size is None and parsed.geography is None and parsed.workforce is None
 
 
 def test_quota_error_found_through_exception_chain():
