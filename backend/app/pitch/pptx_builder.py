@@ -47,6 +47,19 @@ LOGO_W = Inches(1.18)
 ASSETS = Path(__file__).parent / "assets"
 LOGO_WHITE = ASSETS / "marsh-white.png"
 LOGO_NAVY = ASSETS / "marsh-navy.png"
+LOGO_LOCKUP = ASSETS / "marsh-mclennan.png"
+
+# Small section labels, in the sample deck's voice. They do not change slide titles.
+_SECTION = {
+    "cover": ("01", "The advisory"),
+    "glance": ("02", "The decision context"),
+    "map": ("03", "The comparison"),
+    "comparison": ("03", "The comparison"),
+    "perspective": ("04", "The recommendation"),
+    "why": ("04", "The recommendation"),
+    "recommendation": ("05", "For the client"),
+    "decision": ("05", "For the client"),
+}
 
 Reference = tuple[str, str | None]
 
@@ -242,12 +255,11 @@ def _markers_for(slide: Slide, refs_by_chunk: dict[str, SourceRef]) -> tuple[dic
 
 
 def _footer(slide, page: int, year: int):
-    """Text only. The logo is already in the top-left corner, so the footer does not repeat it."""
+    """Content-slide footer from the sample. Text and a page number. The logo stays in the header."""
     del year
-    _line(slide, MARGIN, Inches(7.16), W - MARGIN, Inches(7.16), HAIR, 0.75)
-    _text(slide, MARGIN, Inches(7.20), Inches(2.6), Inches(0.22), "Marsh McLennan", 11, MIDNIGHT, bold=True, anchor=MSO_ANCHOR.MIDDLE)
-    _text(slide, Inches(3.3), Inches(7.20), Inches(7.6), Inches(0.22), "Policy evidence. Client priorities. Advisory recommendation.", 11, MUTED, anchor=MSO_ANCHOR.MIDDLE)
-    _text(slide, Inches(11.2), Inches(7.20), Inches(1.45), Inches(0.22), f"{page:02d}", 11, MIDNIGHT, align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE)
+    _line(slide, Inches(0.62), Inches(7.12), Inches(12.71), Inches(7.12), HAIR, 0.75)
+    _text(slide, Inches(0.62), Inches(7.18), Inches(8.2), Inches(0.24), "Brochure evidence. Policy wording prevails.", 10, MUTED, anchor=MSO_ANCHOR.MIDDLE)
+    _text(slide, Inches(11.60), Inches(7.18), Inches(1.10), Inches(0.24), f"{page:02d}", 11, MIDNIGHT, align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE)
 
 
 def _source_lines(slide, refs: list[Reference], y):
@@ -273,32 +285,38 @@ def _blank(prs) -> object:
     return s
 
 
-def _border(slide):
-    shp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.22), Inches(0.22), W - Inches(0.44), H - Inches(0.44))
-    shp.fill.background()
-    shp.line.color.rgb = MIDNIGHT
-    shp.line.width = Pt(1.25)
-    shp.shadow.inherit = False
+def _rail(slide):
+    """The sample's navy rail. Same thickness on every slide."""
+    _rect(slide, 0, 0, Inches(0.12), H, MIDNIGHT)
 
 
-def _chrome(slide):
-    """One border and one logo, top left, same size on every slide."""
-    _border(slide)
-    _logo(slide, LOGO_NAVY, LOGO_X, LOGO_Y, LOGO_W)
+def _one_logo(slide, *, cover: bool):
+    """One Marsh McLennan lockup. Cover sits top left; every other slide sits top right, as in the sample."""
+    if cover:
+        _logo(slide, LOGO_LOCKUP, Inches(0.62), Inches(0.48), Inches(2.50))
+    else:
+        _logo(slide, LOGO_LOCKUP, Inches(11.35), Inches(0.28), Inches(1.40))
+
+
+def _section(slide, number: str, label: str, *, y=0.32):
+    _text(slide, Inches(0.62), Inches(y), Inches(0.55), Inches(0.24), number, 12, GOLD, bold=True)
+    _text(slide, Inches(1.25), Inches(y), Inches(8.0), Inches(0.24), label, 12, MUTED)
 
 
 def _cover(slide, content: Slide, pitch: Pitch):
-    """Cover copy only. The logo is drawn once by _chrome."""
+    """Cover in the sample's order: logo, heading, subtitle, company, preparation line, date in the footer band."""
     name = (content.bullets[0].text if content.bullets else pitch.company_name).strip() or "the client"
     when = content.bullets[1].text.strip() if len(content.bullets) > 1 else ""
     kicker = content.bullets[2].text.strip() if len(content.bullets) > 2 else "Prepared by Marsh McLennan"
-    _text(slide, MARGIN, Inches(2.15), Inches(11.2), Inches(0.62), content.title or "Health Policy Advisory", 32, MIDNIGHT, bold=True, font=SERIF)
-    _text(slide, MARGIN, Inches(2.9), Inches(10.5), Inches(0.7), content.subtitle or "Evidence-led health insurance recommendation", 16, MUTED)
-    _text(slide, MARGIN, Inches(3.85), Inches(11.2), Inches(0.5), name, 22, MIDNIGHT, bold=True, font=SERIF)
-    _rect(slide, MARGIN, Inches(4.5), Inches(1.15), Inches(0.035), BLUE)
-    _text(slide, MARGIN, Inches(4.7), Inches(8), Inches(0.32), kicker, 15, MIDNIGHT)
+    _section(slide, *_SECTION["cover"], y=1.35)
+    _text(slide, Inches(0.62), Inches(1.75), Inches(11.2), Inches(0.62), content.title or "Health Policy Advisory", 36, MIDNIGHT, font=SERIF)
+    _text(slide, Inches(0.62), Inches(2.50), Inches(10.5), Inches(0.50), content.subtitle or "Evidence-led health insurance recommendation", 20, MIDNIGHT, font=SERIF)
+    _text(slide, Inches(0.62), Inches(3.20), Inches(11.2), Inches(0.85), name, 36, MIDNIGHT, font=SERIF)
+    _rect(slide, Inches(0.62), Inches(4.20), Inches(1.35), Inches(0.035), GOLD)
+    _text(slide, Inches(0.62), Inches(4.40), Inches(10), Inches(0.36), kicker, 16, MUTED)
+    _rect(slide, 0, Inches(6.55), W, Inches(0.95), MIDNIGHT)
     if when:
-        _text(slide, MARGIN, Inches(5.15), Inches(6), Inches(0.28), when, 14, MUTED)
+        _text(slide, Inches(8.2), Inches(6.82), Inches(4.5), Inches(0.36), when, 14, WHITE, align=PP_ALIGN.RIGHT)
 
 
 def _brand(slide):
@@ -311,14 +329,12 @@ def _cols(text: str) -> list[str]:
 
 
 def _kicker(slide, page: int, label: str):
-    """A section label only. The page number stays in the footer, never above the title."""
-    del page
-    if label:
-        _text(slide, Inches(2.05), Inches(0.42), Inches(6), Inches(0.22), label, 11, MIDNIGHT, bold=True)
+    """Section label is drawn once with the logo. Layouts must not add a second one."""
+    del slide, page, label
 
 
 def _slide_title(slide, text: str):
-    _text(slide, MARGIN, Inches(0.82), Inches(12.0), Inches(0.5), _short(text, 52), 32, MIDNIGHT, bold=True, font=SERIF)
+    _text(slide, Inches(0.62), Inches(0.64), Inches(10.4), Inches(0.58), text, 32, MIDNIGHT, bold=True, font=SERIF)
 
 
 def _glance(slide, content: Slide, markers: dict[int, list[Reference]], page: int):
@@ -505,7 +521,7 @@ def _recommendation(slide, content: Slide, pitch: Pitch, markers: dict[int, list
 
 
 def _priorities(slide, content: Slide, page: int):
-    """Two columns: the stated priority, then the decision lens. No scoring language."""
+    """Sample geometry: context on the left, profile facts on the right, assessed needs along the bottom."""
     del page
     _slide_title(slide, content.title or "The decision context")
     priorities = []
@@ -525,30 +541,36 @@ def _priorities(slide, content: Slide, page: int):
     lens = next((body for label, body in (_parts(b.text) for b in content.bullets) if label.upper() == "LENS" and body), "")
     facts = [(label, body) for label, body in (_parts(b.text) for b in content.bullets) if label.upper() in {"INDUSTRY", "SCALE", "FOOTPRINT"} and body and body.lower() != "not established"]
 
-    _text(slide, MARGIN, Inches(1.65), Inches(5.9), Inches(0.22), "CLIENT PRIORITY", 11, MIDNIGHT, bold=True)
+    y = Inches(1.48)
     if priorities:
-        _text(slide, MARGIN, Inches(1.9), Inches(5.9), Inches(0.55), _short(priorities[0][0], 70), 20, MIDNIGHT, bold=True, font=SERIF)
-    else:
-        _text(slide, MARGIN, Inches(1.9), Inches(5.9), Inches(0.55), "Standard coverage requirements", 20, MIDNIGHT, bold=True, font=SERIF)
-    if weight:
-        _text(slide, MARGIN, Inches(2.5), Inches(5.9), Inches(0.22), "PRIORITY WEIGHT", 11, MIDNIGHT, bold=True)
-        _text(slide, MARGIN, Inches(2.72), Inches(5.9), Inches(0.36), weight, 20, MIDNIGHT, bold=True, font=SERIF)
+        _text(slide, Inches(0.62), y, Inches(6.4), Inches(0.20), "CLIENT PRIORITY", 11, MUTED, bold=True)
+        _text(slide, Inches(0.62), y + Inches(0.22), Inches(6.4), Inches(0.55), priorities[0][0], 18, MIDNIGHT, font=SERIF)
+        y += Inches(0.82)
+        if weight:
+            _text(slide, Inches(0.62), y, Inches(6.4), Inches(0.28), f"Priority weight {weight}", 14, INK)
+            y += Inches(0.32)
     if why:
-        _text(slide, MARGIN, Inches(3.2), Inches(5.9), Inches(1.7), _short(why, 320), 15, INK)
-    elif priorities and priorities[0][1]:
-        _text(slide, MARGIN, Inches(3.2), Inches(5.9), Inches(1.2), _short(priorities[0][1], 280), 15, INK)
-    if len(facts) > 1 or (facts and priorities):
-        _text(slide, MARGIN, Inches(5.05), Inches(5.9), Inches(0.4), "  ·  ".join(_short(body, 32) for _label, body in facts[:3]), 15, MUTED)
+        room = Inches(4.85) - y
+        if room > Inches(0.4):
+            _text(slide, Inches(0.62), y, Inches(6.4), room, why, 15, INK, font=SERIF)
 
-    _text(slide, Inches(6.9), Inches(1.65), Inches(5.7), Inches(0.22), "DECISION LENS", 11, MIDNIGHT, bold=True)
+    fy = Inches(1.55)
+    for label, body in facts[:3]:
+        _text(slide, Inches(7.50), fy, Inches(5.1), Inches(0.22), label.upper(), 11, MUTED, bold=True)
+        _text(slide, Inches(7.50), fy + Inches(0.24), Inches(5.1), Inches(0.70), body, 15, INK)
+        fy += Inches(1.05)
+    if not facts and lens:
+        _text(slide, Inches(7.50), Inches(1.55), Inches(5.1), Inches(0.22), "DECISION LENS", 11, MUTED, bold=True)
+        _text(slide, Inches(7.50), Inches(1.82), Inches(5.1), Inches(2.6), lens, 15, INK)
+        lens = ""
+
+    _line(slide, Inches(0.62), Inches(4.95), Inches(12.71), Inches(4.95), HAIR, 0.75)
     if lens:
-        _text(slide, Inches(6.9), Inches(1.92), Inches(5.7), Inches(1.7), _short(lens, 360), 15, INK)
+        _text(slide, Inches(0.62), Inches(5.08), Inches(12.0), Inches(0.20), "DECISION LENS", 11, MUTED, bold=True)
+        _text(slide, Inches(0.62), Inches(5.28), Inches(12.0), Inches(0.55), lens, 14, INK)
     if assessed:
-        _text(slide, Inches(6.9), Inches(3.75), Inches(5.7), Inches(0.22), "WHAT WAS ASSESSED", 11, MIDNIGHT, bold=True)
-        for n, item in enumerate(assessed[:7]):
-            y = Inches(4.08) + n * Inches(0.36)
-            _rect(slide, Inches(6.9), y + Inches(0.06), Inches(0.08), Inches(0.08), BLUE)
-            _text(slide, Inches(7.12), y, Inches(5.4), Inches(0.32), _short(item, 48), 15, INK)
+        _text(slide, Inches(0.62), Inches(5.90), Inches(12.0), Inches(0.20), "WHAT WAS ASSESSED", 11, MUTED, bold=True)
+        _text(slide, Inches(0.62), Inches(6.12), Inches(12.0), Inches(0.85), "   ·   ".join(assessed[:7]), 14, MIDNIGHT)
 
 
 def _comparison(slide, content: Slide, markers: dict[int, list[Reference]], refs_by_chunk: dict[str, SourceRef], page: int):
@@ -567,80 +589,71 @@ def _comparison(slide, content: Slide, markers: dict[int, list[Reference]], refs
     rest = W - MARGIN - label_w - Inches(0.15)
     col_w = rest / ncol
     x0 = MARGIN + label_w
-    top = Inches(1.58)
-    head_h = Inches(0.72)
-    body_bottom = Inches(6.88)
+    top = Inches(1.32)
+    head_h = Inches(0.62)
+    body_bottom = Inches(6.98)
     row_h = (body_bottom - top - head_h) / max(len(rows), 1)
-    if rows:
-        _rect(slide, x0 + highlight * col_w, top, col_w - Inches(0.06), head_h + len(rows) * row_h, BLUE)
-    _text(slide, MARGIN, top + Inches(0.18), label_w - Inches(0.08), Inches(0.28), "DECISION FACTOR", 11, MIDNIGHT, bold=True)
+    _text(slide, Inches(0.42), top + Inches(0.08), label_w - Inches(0.08), Inches(0.40), "DECISION FACTOR", 11, MUTED, bold=True, anchor=MSO_ANCHOR.MIDDLE)
     for n, policy_name in enumerate(header):
-        x = x0 + n * col_w + Inches(0.06)
-        name_y = top + Inches(0.22)
+        x = x0 + n * col_w + Inches(0.04)
         if n == highlight:
-            _text(slide, x, top + Inches(0.04), col_w - Inches(0.12), Inches(0.18), "RECOMMENDED", 11, MIDNIGHT, bold=True)
-            name_y = top + Inches(0.22)
-        _text(slide, x, name_y, col_w - Inches(0.12), Inches(0.46), _short(policy_name, 42), 14, MIDNIGHT, bold=True, font=SERIF)
+            _text(slide, x, top, col_w - Inches(0.10), Inches(0.16), "RECOMMENDED", 10, MIDNIGHT, bold=True)
+        _text(slide, x, top + Inches(0.16), col_w - Inches(0.10), Inches(0.42), policy_name, 12, MIDNIGHT, bold=True, font=SERIF, anchor=MSO_ANCHOR.MIDDLE)
     for n, (cols, _bullet) in enumerate(rows):
         y = top + head_h + n * row_h
-        _line(slide, MARGIN, y, x0 + ncol * col_w - Inches(0.06), y, HAIR, 0.6)
-        _text(slide, MARGIN, y + Inches(0.06), label_w - Inches(0.08), row_h - Inches(0.08), _short(cols[0] if cols else "", 32), 14, MIDNIGHT, bold=True, anchor=MSO_ANCHOR.MIDDLE)
+        _line(slide, Inches(0.42), y, x0 + ncol * col_w - Inches(0.04), y, HAIR, 0.6)
+        _text(slide, Inches(0.42), y + Inches(0.04), label_w - Inches(0.08), row_h - Inches(0.06), cols[0] if cols else "", 14, MIDNIGHT, bold=True, anchor=MSO_ANCHOR.MIDDLE)
         for c in range(ncol):
             phrase = cols[c + 1] if c + 1 < len(cols) else ""
-            x = x0 + c * col_w + Inches(0.06)
-            _text(slide, x, y + Inches(0.04), col_w - Inches(0.12), row_h - Inches(0.06), _short(phrase, 80), 14, INK, anchor=MSO_ANCHOR.MIDDLE)
-
-
-def _policy_banner(slide, name: str, y):
-    _rect(slide, MARGIN, y, Inches(0.08), Inches(0.58), BLUE)
-    _text(slide, Inches(0.88), y, Inches(8), Inches(0.18), "RECOMMENDED POLICY", 11, MIDNIGHT, bold=True)
-    _text(slide, Inches(0.88), y + Inches(0.18), Inches(11.2), Inches(0.4), _short(name, 64), 26, MIDNIGHT, bold=True, font=SERIF)
+            x = x0 + c * col_w + Inches(0.04)
+            _text(slide, x, y + Inches(0.03), col_w - Inches(0.10), row_h - Inches(0.06), phrase, 14, INK, anchor=MSO_ANCHOR.MIDDLE)
 
 
 def _reason_grid(slide, points, refs_by_chunk: dict[str, SourceRef], top):
-    """Two columns of reasons. Headings are words, not 1. 2. 3."""
+    """Criterion, explanation, source. Two columns when there are several reasons. No numbered markers."""
     if not points:
         return
     cols = 2 if len(points) > 1 else 1
     rows = (len(points) + cols - 1) // cols
-    width = Inches(5.85)
-    gap = Inches(0.28)
-    avail = Inches(6.88) - top
+    width = Inches(5.95)
+    gap = Inches(0.22)
+    avail = Inches(7.00) - top
     step = avail / max(rows, 1)
     for n, (b, (label, body)) in enumerate(points):
         col = n % cols
         row = n // cols
-        x = MARGIN + col * (width + gap)
+        x = Inches(0.62) + col * (width + gap)
         y = top + row * step
-        _rect(slide, x, y + Inches(0.04), Inches(0.07), min(step - Inches(0.1), Inches(1.15)), BLUE)
-        _text(slide, x + Inches(0.18), y, width - Inches(0.24), Inches(0.28), _short(label, 36).upper(), 17, MIDNIGHT, bold=True)
-        _text(slide, x + Inches(0.18), y + Inches(0.3), width - Inches(0.24), step - Inches(0.68), body, 15, INK)
+        _text(slide, x, y, width, Inches(0.26), label, 14, MIDNIGHT, bold=True)
+        _text(slide, x, y + Inches(0.28), width, step - Inches(0.52), body, 14, INK)
         ref = next((refs_by_chunk[c] for c in b.source_chunk_ids if c in refs_by_chunk), None)
         if ref:
-            _text(slide, x + Inches(0.18), y + step - Inches(0.36), width - Inches(0.24), Inches(0.32), f"Source: {_provenance(ref)}", 9, MUTED)
+            _text(slide, x, y + step - Inches(0.22), width, Inches(0.20), f"Source: {_provenance(ref)}", 9, MUTED)
+
+
+def _policy_line(slide, name: str):
+    if name:
+        _text(slide, Inches(0.62), Inches(1.26), Inches(11.5), Inches(0.26), name, 14, MUTED)
 
 
 def _why(slide, content: Slide, markers: dict[int, list[Reference]], refs_by_chunk: dict[str, SourceRef], page: int):
-    """The recommended policy, then evidence-backed reasons in two columns."""
+    """The recommended policy, then the generated reasons. Spacing follows the sample."""
     del markers, page
     _slide_title(slide, content.title or "Why this policy fits")
-    policy = next((_parts(b.text)[1] for b in content.bullets if _parts(b.text)[0].upper() == "POLICY"), content.subtitle or "")
-    _policy_banner(slide, policy, Inches(1.48))
-    _text(slide, MARGIN, Inches(2.16), Inches(12), Inches(0.26), "Why it fits the client's requirements", 15, INK)
+    policy = next((_parts(b.text)[1] for b in content.bullets if _parts(b.text)[0].upper() == "POLICY"), "")
+    _policy_line(slide, policy or (content.subtitle or ""))
     points = [(b, _parts(b.text)) for b in content.bullets if _parts(b.text)[0].upper() not in {"POLICY", "COLUMNS", "ALTERNATIVE", "REC"} and not b.text.startswith("Alternative|")][:6]
-    _reason_grid(slide, points, refs_by_chunk, Inches(2.5))
+    _reason_grid(slide, points, refs_by_chunk, Inches(1.60))
 
 
 def _decision(slide, content: Slide, markers: dict[int, list[Reference]], refs_by_chunk: dict[str, SourceRef], page: int):
-    """Five client blocks. Alternatives stay inside those blocks, not in an empty panel."""
+    """Client takeaway from the generated blocks. An empty alternative is not given a section."""
     del markers, page
     _slide_title(slide, content.title or "What this means for the client")
     policy = next((_parts(b.text)[1] for b in content.bullets if _parts(b.text)[0].upper() == "POLICY"), "")
-    _policy_banner(slide, policy, Inches(1.42))
-    if content.subtitle:
-        _text(slide, MARGIN, Inches(2.08), Inches(12), Inches(0.24), content.subtitle, 15, INK)
-    points = [(b, _parts(b.text)) for b in content.bullets if _parts(b.text)[0].upper() not in {"POLICY", "ALTERNATIVE", "COLUMNS", "REC"} and not b.text.startswith("Alternative|")][:5]
-    _reason_grid(slide, points, refs_by_chunk, Inches(2.36))
+    _policy_line(slide, policy)
+    points = [(b, _parts(b.text)) for b in content.bullets if _parts(b.text)[0].upper() not in {"POLICY", "ALTERNATIVE", "COLUMNS", "REC"} and not b.text.startswith("Alternative|")][:6]
+    _reason_grid(slide, points, refs_by_chunk, Inches(1.60))
 
 
 def _profile_slide(content: Slide) -> bool:
@@ -677,11 +690,14 @@ def build_pitch_deck(pitch: Pitch, refs_by_chunk: dict[str, SourceRef], out_path
     for n, content in enumerate(pitch.slides, start=1):
         s = _blank(prs)
         markers, refs = _markers_for(content, refs_by_chunk)
-        _chrome(s)
+        _rail(s)
         if content.layout == "cover":
+            _one_logo(s, cover=True)
             _cover(s, content, pitch)
-            _footer(s, n, now.year)
             continue
+        _one_logo(s, cover=False)
+        number, label = _SECTION.get(content.layout, (f"{n:02d}", "Advisory"))
+        _section(s, number, label)
         _brand(s)
         if content.layout == "glance" or _profile_slide(content):
             _glance(s, content, markers, n)
