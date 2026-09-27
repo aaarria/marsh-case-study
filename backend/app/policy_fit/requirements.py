@@ -148,7 +148,8 @@ def _class_for(exposure: Exposure) -> RequirementClass:
     text = f"{exposure.title} {exposure.description}".lower()
     if any(word in text for word in _MUST_WORDS):
         return RequirementClass.MUST_HAVE
-    if exposure.priority >= 1.5 or exposure.title.lower().startswith("advisor priority"):
+    stated = exposure.title.lower().startswith("advisor priority") or "advisor_priority" in (exposure.basis or [])
+    if stated:
         return RequirementClass.PREFERENCE
     return RequirementClass.BASELINE
 

@@ -99,6 +99,8 @@ def _materiality(text: str) -> ConditionMateriality:
     lowered = text.lower()
     if any(token in lowered for token in _CRITICAL):
         return ConditionMateriality.CRITICAL
+    if any(token in lowered for token in ("zero waiting", "no waiting period", "day 1 cover")):
+        return ConditionMateriality.INFO
     if any(token in lowered for token in _MATERIAL):
         return ConditionMateriality.MATERIAL
     if any(token in lowered for token in _MINOR):

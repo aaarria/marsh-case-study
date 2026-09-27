@@ -66,6 +66,15 @@ class ScoringConfig:
     limit_below_target_score: float = 30.0
     sublimit_cap_score: float = 60.0
     sublimit_unquantified_cap: float = 70.0
+    # "Up to sum insured" is a ceiling. It is not the same as room rent at actuals.
+    room_rent_up_to_si_score: float = 75.0
+    chronic_base_zero_score: float = 100.0
+    chronic_variant_zero_score: float = 70.0
+    chronic_addon_within_month_score: float = 45.0
+    chronic_addon_after_month_score: float = 30.0
+    cost_lever_score: float = 100.0
+    cost_lever_partial_score: float = 80.0
+    cost_lever_absent_score: float = 40.0
     eligibility_met_score: float = 100.0
     eligibility_conditional_score: float = 70.0
     eligibility_fail_score: float = 0.0

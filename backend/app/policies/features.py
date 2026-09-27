@@ -164,8 +164,37 @@ EXPOSURE_KEYWORD_MAP: dict[str, list[str]] = {
 }
 
 
+# Longer phrases win over the generic keyword map so "no room rent capping" stays room rent.
+_DIRECT_REQUIREMENTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("cost control", ("copay", "deductible_options")),
+    ("co-pay option", ("copay", "deductible_options")),
+    ("copay option", ("copay", "deductible_options")),
+    ("no room rent", ("room_rent",)),
+    ("room rent", ("room_rent",)),
+    ("room-rent", ("room_rent",)),
+    ("no capping", ("room_rent",)),
+    ("day-one", ("chronic_conditions_day1",)),
+    ("day one", ("chronic_conditions_day1",)),
+    ("from day 1", ("chronic_conditions_day1",)),
+    ("chronic", ("chronic_conditions_day1",)),
+    ("global cover", ("global_cover",)),
+    ("international treatment", ("global_cover",)),
+    ("wellness and opd", ("wellness_renewal_discount", "teleconsultation_opd")),
+    ("maternity", ("maternity",)),
+    ("accident", ("personal_accident",)),
+)
+
+
 def map_text_to_features(text: str, limit: int = 6) -> list[str]:
     t = text.lower()
+    direct: list[str] = []
+    for phrase, keys in _DIRECT_REQUIREMENTS:
+        if phrase in t:
+            for key in keys:
+                if key not in direct:
+                    direct.append(key)
+    if direct:
+        return direct[:limit]
     scores: dict[str, int] = {}
     for kw, keys in EXPOSURE_KEYWORD_MAP.items():
         if kw in t:

@@ -366,5 +366,9 @@ def get_policy_facts(policy_ids: list[str] | None = None) -> dict[str, PolicyExt
     retriever = get_retriever()
     ids = policy_ids or [p.policy_id for p in retriever.store.list_policies()]
     if facts and all(pid in facts for pid in ids):
-        return {pid: facts[pid] for pid in ids}
-    return {pid: r for pid, r in extract_all_policies(policy_ids=ids).items() if pid in ids}
+        selected = {pid: facts[pid] for pid in ids}
+    else:
+        selected = {pid: result for pid, result in extract_all_policies(policy_ids=ids).items() if pid in ids}
+    from app.policies.normalize import apply_normalization
+
+    return apply_normalization(selected, lambda pid: retriever.store.list_chunks(pid))

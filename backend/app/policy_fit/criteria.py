@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from app.models.fit import ClientRequirement, CoverageExpectation, CriterionType
 from app.models.policy import ConditionMateriality, CoverageStatus, FeatureFact
+from app.policies.conditions import _materiality
 from app.policy_fit.scoring_config import DEFAULT_SCORING, ScoringConfig, deductible_fit_score
 from app.utils.numerals import extract_numbers
 
@@ -87,8 +88,8 @@ COMPARATOR_RULES: dict[str, dict[str, str]] = {
         "unit": "INR or at-actuals flag",
         "target": "no sub-limit / at actuals",
         "direction": "uncapped is better than a cap",
-        "full_fit": "at actuals, no sub-limit, no capping, or unlimited scores covered_score",
-        "partial_fit": "a stated numeric cap scores sublimit_cap_score",
+        "full_fit": "at actuals, or no room-rent cap that is not also an SI ceiling, scores covered_score",
+        "partial_fit": "covered up to sum insured scores room_rent_up_to_si_score; a numeric cap scores sublimit_cap_score",
         "failure": "EXCLUDED scores failed_score",
         "missing_evidence": "unquantified text is capped at sublimit_unquantified_cap; missing status scores None",
         "exception": "A named condition caps the score once",
@@ -286,6 +287,9 @@ def _typed_score(
     if kind == CriterionType.SUBLIMIT:
         score, note = _sublimit(requirement, fact, status, cfg)
         return score, note, None, False
+    if requirement.feature == "chronic_conditions_day1":
+        score, note = _chronic(requirement, fact, status, cfg)
+        return score, note, None, False
     if kind == CriterionType.EXCLUSION:
         return _exclusion(requirement, fact, cfg)
     if kind == CriterionType.ELIGIBILITY:
@@ -319,6 +323,30 @@ def _add_on(requirement: ClientRequirement, fact: FeatureFact, status: CoverageS
             must_have_gap=gap,
             note=f"Add-on does not satisfy a {expectation.value} requirement.",
         )
+    if requirement.feature == "chronic_conditions_day1":
+        days = fact.waiting_period_days
+        if days is None:
+            score = cfg.add_on_accepted_score
+            note = "Optional chronic cover. Waiting length is not quantified."
+        elif days <= 30:
+            score = cfg.chronic_addon_within_month_score
+            note = f"Optional chronic cover after {days:g} days. Not day-one base cover."
+        else:
+            score = cfg.chronic_addon_after_month_score
+            note = f"Optional chronic cover after {days:g} days. Not day-one base cover."
+        return CriterionJudgement(score=score, status=CoverageStatus.ADD_ON, note=note)
+    if requirement.feature == "deductible_options" and _wants_cost_lever(requirement):
+        return CriterionJudgement(
+            score=cfg.cost_lever_score,
+            status=CoverageStatus.ADD_ON,
+            note="Selectable deductible is documented as an option, not as base cover.",
+        )
+    if requirement.feature == "copay" and _wants_cost_lever(requirement):
+        return CriterionJudgement(
+            score=cfg.cost_lever_partial_score,
+            status=CoverageStatus.ADD_ON,
+            note="Optional co-pay is a cost-control lever. It is not a base-plan co-pay.",
+        )
     return CriterionJudgement(
         score=cfg.add_on_accepted_score,
         status=CoverageStatus.ADD_ON,
@@ -334,7 +362,7 @@ def _finalize(judgement: CriterionJudgement, requirement: ClientRequirement, fac
     if judgement.explicit_exclusion:
         judgement.must_have_gap = _is_must_have(requirement)
         return judgement
-    unique = _unique_conditions(fact)
+    unique = _extra_restrictions(requirement, fact)
     if unique and requirement.type != CriterionType.CONDITION:
         worst_text, worst = max(unique, key=lambda item: _MATERIALITY_RANK[item[1]])
         cap = _materiality_score(worst, cfg)
@@ -458,6 +486,11 @@ def _copay(requirement: ClientRequirement, fact: FeatureFact, cfg: ScoringConfig
         nums = extract_numbers(fact.copay)
         if nums.percents:
             percent = nums.percents[0]
+    if _wants_cost_lever(requirement):
+        if percent is None or not math.isfinite(percent) or percent <= 0:
+            return cfg.cost_lever_absent_score, "No co-pay percentage is available as a cost-control option."
+        label = fact.copay or (f"{percent:g}%" if percent is not None else "unspecified")
+        return cfg.cost_lever_partial_score, f"Co-payment {label} is a stated cost-control option."
     target = requirement.target_value if requirement.target_value is not None else cfg.copay_target_percent
     tolerance = requirement.tolerance if requirement.tolerance is not None else cfg.copay_tolerance_percent
     if percent is None or not math.isfinite(percent):
@@ -473,6 +506,8 @@ def _copay(requirement: ClientRequirement, fact: FeatureFact, cfg: ScoringConfig
 def _deductible(requirement: ClientRequirement, fact: FeatureFact, cfg: ScoringConfig) -> tuple[float, str]:
     amount = fact.deductible_amount
     text = " ".join(x for x in (fact.deductible, fact.limit, fact.original_quote, fact.value) if x)
+    if _wants_cost_lever(requirement) and "deductible" in text.lower():
+        return cfg.cost_lever_score, "Selectable deductible options are documented."
     if amount is None and text:
         nums = extract_numbers(text)
         if nums.money:
@@ -512,14 +547,42 @@ def _limit(requirement: ClientRequirement, fact: FeatureFact, status: CoverageSt
     return _coverage(status, cfg)
 
 
+def _wants_cost_lever(requirement: ClientRequirement) -> bool:
+    text = requirement.description.lower()
+    return any(phrase in text for phrase in ("cost control", "co-pay option", "copay option", "deductible option"))
+
+
 def _sublimit(requirement: ClientRequirement, fact: FeatureFact, status: CoverageStatus, cfg: ScoringConfig) -> tuple[float, str]:
     text = " ".join(x for x in (fact.limit, fact.original_quote, fact.value, fact.sublimit) if x).lower()
-    if any(token in text for token in ("at actual", "no sub-limit", "no sublimit", "no capping", "unlimited")):
-        return cfg.covered_score, "No sub-limit; benefit is at actuals."
+    up_to_si = any(token in text for token in (
+        "up to si", "up to sum insured", "up to the sum insured", "covered up to sum insured", "up to your base sum insured",
+    ))
+    if any(token in text for token in ("at actual",)):
+        return cfg.covered_score, "Room rent is at actuals. That is not the same as a sum-insured ceiling."
+    if up_to_si:
+        return cfg.room_rent_up_to_si_score, "Room rent is covered up to the sum insured. That is a ceiling, not at-actuals."
+    if any(token in text for token in ("no sub-limit", "no sublimit", "no capping", "unlimited")):
+        return cfg.covered_score, "No separate room-rent cap is stated."
     if fact.limit_numeric is not None or (fact.limit and any(ch.isdigit() for ch in fact.limit)):
         return cfg.sublimit_cap_score, "A sub-limit or cap is stated."
     base, note = _coverage(status, cfg)
     return min(base, cfg.sublimit_unquantified_cap), note
+
+
+def _chronic(requirement: ClientRequirement, fact: FeatureFact, status: CoverageStatus, cfg: ScoringConfig) -> tuple[float, str]:
+    """Day-one chronic cover. Zero waiting on the base plan is the strongest reading."""
+    days = fact.waiting_period_days
+    variant = bool(fact.variant_scope) or status == CoverageStatus.CONDITIONAL
+    if days is None:
+        base, note = _coverage(status, cfg)
+        return min(base, cfg.waiting_unquantified_cap), note + " Day-one waiting length is not quantified."
+    if days <= 0 and variant:
+        return cfg.chronic_variant_zero_score, "Zero waiting period is stated for a plan variant, not as unrestricted base cover."
+    if days <= 0:
+        return cfg.chronic_base_zero_score, "Explicit day-one cover with zero waiting period."
+    if days <= 30:
+        return 55.0, f"Waiting period is {days:g} days. That is not day-one cover."
+    return 25.0, f"Waiting period is {days:g} days. That is not day-one cover."
 
 
 def _condition_score(fact: FeatureFact, status: CoverageStatus, cfg: ScoringConfig) -> tuple[float | None, str, str | None]:
@@ -533,6 +596,31 @@ def _condition_score(fact: FeatureFact, status: CoverageStatus, cfg: ScoringConf
         return base, note, None
     worst_text, worst = max(unique, key=lambda item: _MATERIALITY_RANK[item[1]])
     return _materiality_score(worst, cfg), f"Condition {worst.value}: {worst_text}.", worst.value
+
+
+# The benefit's own name is not a second restriction. A deductible quote that says
+# "deductible" is the deductible; a co-pay quote that says "co-payment" is the co-pay.
+_OWN_MECHANISM = {
+    "deductible_options": ("deductible",),
+    "copay": ("co-pay", "co-payment", "copay", "network hospital"),
+}
+
+
+def _extra_restrictions(requirement: ClientRequirement, fact: FeatureFact) -> list[tuple[str, ConditionMateriality]]:
+    own = _OWN_MECHANISM.get(requirement.feature, ())
+    kept: list[tuple[str, ConditionMateriality]] = []
+    for text, materiality in _unique_conditions(fact):
+        if not own:
+            kept.append((text, materiality))
+            continue
+        stripped = text.lower()
+        for token in own:
+            stripped = stripped.replace(token, " ")
+        residual = _materiality(stripped)
+        if _MATERIALITY_RANK[residual] < _MATERIALITY_RANK[ConditionMateriality.MINOR] and materiality != ConditionMateriality.CRITICAL:
+            continue
+        kept.append((text, residual if _MATERIALITY_RANK[residual] < _MATERIALITY_RANK[materiality] else materiality))
+    return kept
 
 
 def _unique_conditions(fact: FeatureFact) -> list[tuple[str, ConditionMateriality]]:
