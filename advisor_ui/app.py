@@ -1,9 +1,8 @@
-"""Advisor screen for the existing Marsh API.
+"""Advisor screen. Starts the existing API in this process and shows what it returns.
 
 This file does not score policies, write the pitch, or audit claims.
-It calls the FastAPI service and shows what that service already returns.
 
-Run the API first, then from the repo root:
+From the repo root:
 
     backend/.venv/bin/pip install -r advisor_ui/requirements.txt
     backend/.venv/bin/streamlit run advisor_ui/app.py
@@ -11,10 +10,29 @@ Run the API first, then from the repo root:
 from __future__ import annotations
 
 import os
+import sys
+import threading
 import time
+from pathlib import Path
 
 import httpx
 import streamlit as st
+
+ROOT = Path(__file__).resolve().parents[1]
+BACKEND = ROOT / "backend"
+LOCAL_API = "http://127.0.0.1:8765"
+_SECRET_KEYS = (
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
+    "GEMINI_THINKING_LEVEL",
+    "WEB_RESEARCH_ENABLED",
+    "EMBEDDING_PROVIDER",
+    "GEMINI_EMBEDDING_MODEL",
+    "RERANKER_ENABLED",
+    "RERANKER_MODEL",
+)
+_server_lock = threading.Lock()
+_server_started = False
 
 PRIORITIES = [
     "maternity benefits",
@@ -42,17 +60,74 @@ STEPS = {
 }
 
 
-def configured_api() -> str:
-    """Local default is localhost. Streamlit Cloud reads API_URL from the app secrets."""
+def _apply_secrets() -> None:
+    """Copy Streamlit secrets into the environment before the API process reads them."""
     try:
-        secret = st.secrets.get("API_URL")
+        secrets = st.secrets
     except Exception:
-        secret = None
-    return str(secret or os.environ.get("API_URL") or "http://localhost:8000").rstrip("/")
+        secrets = {}
+    for key in _SECRET_KEYS:
+        try:
+            value = secrets[key]
+        except Exception:
+            continue
+        if value not in (None, ""):
+            os.environ[key] = str(value)
+    if not (ROOT / ".env").exists():
+        os.environ.setdefault("GEMINI_MODEL", "gemini-3.5-flash-lite")
+        os.environ.setdefault("GEMINI_THINKING_LEVEL", "low")
+        os.environ.setdefault("WEB_RESEARCH_ENABLED", "true")
+        os.environ.setdefault("EMBEDDING_PROVIDER", "local")
+        os.environ.setdefault("RERANKER_ENABLED", "false")
+
+
+def _start_embedded_api() -> None:
+    """Run the existing FastAPI app inside this Streamlit process. No separate host."""
+    global _server_started
+    with _server_lock:
+        if _server_started:
+            return
+        _apply_secrets()
+        if str(BACKEND) not in sys.path:
+            sys.path.insert(0, str(BACKEND))
+
+        def _run() -> None:
+            import uvicorn
+
+            uvicorn.run("app.main:app", host="127.0.0.1", port=8765, log_level="warning")
+
+        threading.Thread(target=_run, daemon=True, name="marsh-api").start()
+        _server_started = True
+
+
+def configured_api() -> str:
+    _start_embedded_api()
+    return LOCAL_API
 
 
 def api_base() -> str:
-    return st.session_state.get("api_url", configured_api()).rstrip("/")
+    return configured_api().rstrip("/")
+
+
+def wait_until_ready(seconds: float = 180) -> dict:
+    deadline = time.time() + seconds
+    last = "The advisory service is still starting."
+    while time.time() < deadline:
+        try:
+            health = request("GET", "/api/health", timeout=15)
+        except Exception as exc:
+            last = str(exc)
+            time.sleep(2)
+            continue
+        boot = health.get("bootstrap") or {}
+        if boot.get("status") == "failed":
+            raise RuntimeError(boot.get("error") or "The knowledge base failed to start.")
+        retrieval = health.get("retrieval") or {}
+        if retrieval.get("ready") and int(retrieval.get("chunks") or 0) > 0:
+            return health
+        last = "Loading the policy index."
+        time.sleep(2)
+    raise RuntimeError(last)
 
 
 def request(method: str, path: str, **kwargs):
@@ -239,19 +314,24 @@ def show_run(run_id: str):
 def main():
     st.set_page_config(page_title="Marsh Health Policy Advisory", layout="wide")
     st.title("Marsh Health Policy Advisory")
-    st.caption("Evidence-led health insurance comparison. This screen uses the existing API.")
+    st.caption("Evidence-led health insurance comparison and advisory system.")
+
+    _apply_secrets()
+    if not os.environ.get("GEMINI_API_KEY") and not (ROOT / ".env").exists():
+        st.error("Add GEMINI_API_KEY in Advanced settings, under Secrets, then reboot the app.")
+        st.code('GEMINI_API_KEY = "paste the key from your .env"', language="toml")
+        return
+
+    with st.spinner("Starting the advisory in this app."):
+        try:
+            health = wait_until_ready()
+        except Exception as exc:
+            st.error(str(exc))
+            return
 
     with st.sidebar:
-        st.session_state["api_url"] = st.text_input("API", configured_api())
-        try:
-            health = request("GET", "/api/health", timeout=20)
-            st.success("API ready" if health.get("status") == "ok" else "API responded")
-            st.caption(f"{health.get('llm_model') or 'no model'} · research {'on' if health.get('research_configured') else 'off'}")
-        except Exception as exc:
-            st.error(f"API unreachable. {exc}")
-            health = None
-        if st.button("Refresh runs"):
-            st.session_state.pop("runs", None)
+        st.success("Advisory ready")
+        st.caption(f"{health.get('llm_model') or 'no model'} · research {'on' if health.get('research_configured') else 'off'}")
 
     if "run_id" not in st.session_state:
         st.session_state["run_id"] = None
