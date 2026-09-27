@@ -31,6 +31,7 @@ class AdvisoryState(TypedDict, total=False):
     # pitch & audit
     pitch: dict[str, Any]
     pitch_warnings: list[str]
+    pitch_stale: bool  # true after a recalculated recommendation until the pitch is regenerated
     audit: dict[str, Any]
     audit_history: list[dict[str, Any]]
     regenerate_feedback: str | None

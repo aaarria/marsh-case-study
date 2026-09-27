@@ -341,7 +341,7 @@ def _glance(slide, content: Slide, markers: dict[int, list[Reference]]):
 
 def _journey(slide, content: Slide, markers: dict[int, list[Reference]], refs_by_chunk: dict[str, SourceRef]):
     _kicker(slide, 3, "The fit")
-    _text(slide, MARGIN, Inches(0.7), Inches(12), Inches(0.62), "From exposure to benefit", 36, MIDNIGHT, font=SERIF)
+    _text(slide, MARGIN, Inches(0.7), Inches(12), Inches(0.62), _short(content.title or "From exposure to benefit", 48), 36, MIDNIGHT, font=SERIF)
     exposures = [(i, b) for i, b in enumerate(content.bullets) if b.kind in {"company", "assumption"}]
     benefits = [(i, b) for i, b in enumerate(content.bullets) if b.kind == "policy"]
     why = next((b for b in content.bullets if b.kind == "recommendation"), None)
@@ -387,7 +387,7 @@ def _journey(slide, content: Slide, markers: dict[int, list[Reference]], refs_by
 
 def _perspective(slide, content: Slide, markers: dict[int, list[Reference]], refs_by_chunk: dict[str, SourceRef]):
     _kicker(slide, 4, "Perspective")
-    _text(slide, MARGIN, Inches(0.7), Inches(6), Inches(0.7), "Why Marsh", 36, MIDNIGHT, font=SERIF)
+    _text(slide, MARGIN, Inches(0.7), Inches(6), Inches(0.7), _short(content.title or "Why Marsh", 36), 36, MIDNIGHT, font=SERIF)
     _text(slide, Inches(7.15), Inches(0.7), Inches(5.5), Inches(0.7), "What to watch", 36, MIDNIGHT, font=SERIF)
     _line(slide, Inches(6.85), Inches(1.55), Inches(6.85), Inches(6.35), HAIR)
     marsh = [(i, b) for i, b in enumerate(content.bullets) if b.kind == "marsh"][:3]
@@ -407,7 +407,7 @@ def _perspective(slide, content: Slide, markers: dict[int, list[Reference]], ref
         note = _provenance(ref) if ref else ("Not confirmed in the brochure" if tag == "GAP" else "")
         tb = _textbox(slide, Inches(8.65), y, Inches(3.95), Inches(1.0))
         p = tb.text_frame.paragraphs[0]
-        _run(p, _short(body or b.text, 78), 14, INK)
+        _run(p, _short(body or b.text, 130), 14, INK)
         _mark(p, markers.get(i, []), 14)
         if note:
             p2 = tb.text_frame.add_paragraph()
@@ -461,14 +461,20 @@ def _recommendation(slide, content: Slide, pitch: Pitch, markers: dict[int, list
 
 
 def _editorial_list(slide, content: Slide, page: int, markers: dict[int, list[Reference]]):
-    """Fallback for a deck whose slides are not in the five-part layout. Still editorial, still cited."""
+    """Fallback for a deck whose slides are not in the five-part layout. Still editorial, still cited.
+
+    Prints the same title, subtitle, and bullet text the canvas fallback shows.
+    """
     _kicker(slide, page, "Advisory")
-    _text(slide, MARGIN, Inches(0.72), Inches(12), Inches(0.7), _short(content.title or "Notes", 70), 32, MIDNIGHT, font=SERIF)
-    y = Inches(1.7)
+    _text(slide, MARGIN, Inches(0.72), Inches(12), Inches(0.55), _short(content.title or "Notes", 70), 32, MIDNIGHT, font=SERIF)
+    y = Inches(1.4)
+    if content.subtitle:
+        _text(slide, MARGIN, y, W - 2 * MARGIN, Inches(0.4), _short(content.subtitle, 160), 16, MUTED)
+        y = Inches(1.9)
     for i, b in enumerate(content.bullets[:5]):
         tb = _textbox(slide, MARGIN, y, W - 2 * MARGIN, Inches(0.7))
         p = tb.text_frame.paragraphs[0]
-        _run(p, _short(_parts(b.text)[1] or b.text, 160), 16, INK)
+        _run(p, _short(b.text.strip(), 180), 16, INK)
         _mark(p, markers.get(i, []), 16)
         y += Inches(0.75)
 

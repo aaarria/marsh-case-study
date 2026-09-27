@@ -8,6 +8,17 @@ import { StatusPill } from "@/components/status-badge";
 import { SourceQuote } from "@/components/source-ref";
 import { api, ApiError } from "@/lib/api";
 import type { AdvisorView, EvidenceLookup } from "@/lib/types";
+import type { Tone } from "@/components/callout";
+
+const STATE_TONE: Record<string, Tone> = {
+  COVERED: "ok",
+  CONDITIONAL: "warn",
+  PARTIAL: "warn",
+  ADD_ON: "info",
+  EXCLUDED: "danger",
+  NOT_ESTABLISHED: "neutral",
+  REVIEW_REQUIRED: "warn",
+};
 
 function Mark({ on, label }: { on: boolean; label: string }) {
   return (
@@ -154,26 +165,38 @@ export function ComparisonBrief({ view, runId }: { view: AdvisorView; runId: str
   if (!comparison || comparison.rows.length === 0) return <p className="text-xs text-muted-foreground">The comparison is not ready. Missing cells stay not established.</p>;
   return (
     <div className="space-y-2">
-      {comparison.rows.map((row) => (
-        <div key={row.feature} className="rounded-md border border-hairline p-2">
-          <div className="text-xs font-medium text-ink">{row.label}</div>
-          <ul className="mt-1 space-y-0.5">
-            {row.cells.map((cell) => (
-              <li key={cell.policy_id} className="flex items-center justify-between gap-2 text-xs">
-                <span className="truncate text-body">{cell.policy_name}</span>
-                <span className="shrink-0 text-muted-foreground">{cell.status_label}</span>
-              </li>
+      <div>
+        <div className="text-sm font-medium text-ink">COVERAGE & EVIDENCE MATRIX</div>
+        <p className="text-xs text-muted-foreground">One row is a client requirement. One column is a policy. The label is the evidence state. Colour does not rank the policies, and this view does not calculate fit.</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[28rem] border-collapse text-left text-xs">
+          <thead>
+            <tr className="border-b border-hairline text-muted-foreground">
+              <th className="py-1 pr-2 font-medium">Requirement</th>
+              {comparison.policies.map((policy) => (
+                <th key={policy.policy_id} className="px-1 py-1 font-medium">{policy.policy_name || policy.policy_id}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {comparison.rows.map((row) => (
+              <tr key={row.feature} className="border-b border-hairline align-top">
+                <th className="py-1.5 pr-2 font-medium text-ink">{row.label}</th>
+                {row.cells.map((cell) => (
+                  <td key={cell.policy_id} className="px-1 py-1.5">
+                    <button type="button" className="focus-ring rounded-sm text-left" title={`${cell.policy_name || cell.policy_id}: ${cell.status_label}. Open the brochure evidence.`} onClick={() => setEvidence({ policyId: cell.policy_id, feature: row.feature, label: row.label })}>
+                      <StatusPill tone={STATE_TONE[cell.state || ""] || "neutral"} size="xs">{cell.status_label}</StatusPill>
+                      {cell.state && <div className="mt-0.5 font-mono text-2xs text-quiet">{cell.state}</div>}
+                    </button>
+                  </td>
+                ))}
+              </tr>
             ))}
-          </ul>
-          <div className="mt-1 flex flex-wrap gap-2">
-            {row.cells.map((cell) => (
-              <button key={`${row.feature}-${cell.policy_id}`} type="button" className="focus-ring text-2xs text-ink underline-offset-2 hover:underline" onClick={() => setEvidence({ policyId: cell.policy_id, feature: row.feature, label: row.label })}>
-                View evidence · {cell.policy_name}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-2xs text-quiet">Not established means the brochure evidence does not settle the point. It is not an exclusion. Select a cell to read the quote, page, and evidence reference.</p>
       {evidence && <EvidenceDrawer key={`${evidence.policyId}:${evidence.feature}`} runId={runId} policyId={evidence.policyId} feature={evidence.feature} label={evidence.label} onClose={() => setEvidence(null)} />}
     </div>
   );

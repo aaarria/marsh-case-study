@@ -141,6 +141,8 @@ def answer_run(run_id: str, answer: dict[str, Any], background: bool = True) -> 
     if answer.get("action") == "approve":
         from app.api.advisor_view import approval_allowed
 
+        if (snap.values or {}).get("pitch_stale"):
+            raise RunStateError("The recommendation changed. Regenerate the pitch and wait for the new audit before approving.")
         gate = (((snap.values or {}).get("audit") or {}).get("summary") or {}).get("gate")
         allowed, reason = approval_allowed(gate, answer.get("reviewer"))
         if not allowed:
@@ -232,6 +234,33 @@ def retry_run(run_id: str, background: bool = True) -> None:
     else:
         prepare()
         _execute(run_id, payload)
+
+
+def save_recalculation(run_id: str, result: dict[str, Any]) -> dict[str, Any]:
+    """Write a supported recalculation onto a paused review. Does not regenerate the pitch."""
+    if not result.get("applied"):
+        return result
+    graph = get_graph()
+    snap = graph.get_state(_config(run_id))
+    if not snap or not snap.values:
+        raise RunNotFound(run_id)
+    if "human_review" not in (snap.next or ()):
+        result = {**result, "applied": False, "message": "The fit was recalculated, but it can be saved only while the pitch is in review. The recommendation on this run was not changed."}
+        return result
+    history = list((snap.values or {}).get("recommendation_history") or [])
+    if result.get("history"):
+        history.append(result["history"])
+    graph.update_state(
+        _config(run_id),
+        {
+            "recommendation": result["recommendation"],
+            "fits": result.get("fits") or [],
+            "requirements": result.get("requirements") or [],
+            "recommendation_history": history,
+            "pitch_stale": True,
+        },
+    )
+    return result
 
 
 def get_state(run_id: str) -> dict[str, Any]:

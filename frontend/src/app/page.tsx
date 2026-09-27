@@ -15,7 +15,7 @@ import { SystemNotice } from "@/components/system-notice";
 import { api, ApiError } from "@/lib/api";
 import { useHealth } from "@/lib/use-health";
 import { PRIORITY_SUGGESTIONS } from "@/lib/intake";
-import type { PolicyDocument } from "@/lib/types";
+import type { PolicyDocument, PolicyUploadStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const MIN_POLICIES = 2;
@@ -32,6 +32,7 @@ export default function Composer() {
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const [uploads, setUploads] = useState<PolicyUploadStatus[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function Composer() {
         setSelected(p.policies.map((x) => x.policy_id));
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : String(e)));
+    api.policyUploads().then((rows) => setUploads(rows.uploads)).catch(() => setUploads([]));
   }, []);
 
   const name = company.trim();
@@ -156,12 +158,17 @@ export default function Composer() {
             <div className="border-t border-hairline px-3 py-2">
               <ChipGroup label="Policies in scope">
                 {policies.length === 0 && <span className="text-xs text-quiet">Loading brochures…</span>}
-                {policies.map((p) => (
-                  <Chip key={p.policy_id} size="xs" selected={selected.includes(p.policy_id)} onClick={() => setSelected((s) => (s.includes(p.policy_id) ? s.filter((x) => x !== p.policy_id) : [...s, p.policy_id]))} title={`${p.insurer} · ${p.pages} pages`}>
-                    {p.policy_name}
-                  </Chip>
-                ))}
+                {policies.map((p) => {
+                  const on = selected.includes(p.policy_id);
+                  return (
+                    <Chip key={p.policy_id} size="xs" selected={on} onClick={() => setSelected((s) => (s.includes(p.policy_id) ? s.filter((x) => x !== p.policy_id) : [...s, p.policy_id]))} title={`${p.insurer} · ${p.pages} pages · Ready · ${on ? "Selected" : "Not selected"}`}>
+                      {p.policy_name}
+                      <span className="ml-1 text-quiet">{on ? "Ready · Selected" : "Ready · Not selected"}</span>
+                    </Chip>
+                  );
+                })}
               </ChipGroup>
+              <p className="mt-1.5 text-2xs text-quiet">Ready means the supplied brochure is ingested. Selected means it is in this comparison. Uploading a file does not add it.</p>
               {tooFew && <p className="tone-danger tint-text mt-1.5 text-xs">Keep at least {MIN_POLICIES} policies: a recommendation needs something to be compared against.</p>}
               <label className="mt-2 inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
                 <input
@@ -176,6 +183,8 @@ export default function Composer() {
                     try {
                       const stored = await api.uploadPolicy(file);
                       setUploadNote(stored.message);
+                      const rows = await api.policyUploads();
+                      setUploads(rows.uploads);
                     } catch (err) {
                       setUploadNote(null);
                       setError(err instanceof ApiError ? err.message : "That file could not be stored.");
@@ -185,6 +194,15 @@ export default function Composer() {
                 Store another PDF separately
               </label>
               {uploadNote && <p className="mt-1.5 text-xs text-muted-foreground">{uploadNote}</p>}
+              {uploads.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {uploads.map((row, index) => (
+                    <li key={`${row.original_name}-${index}`} className="text-xs text-muted-foreground">
+                      {row.original_name} · {row.status === "Failed" ? "Failed" : "Uploaded"} · Not selected · Not in the four-policy comparison
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </form>
 

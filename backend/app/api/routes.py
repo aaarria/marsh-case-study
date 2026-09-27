@@ -8,7 +8,16 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
-from app.api.schemas import AnalyzeRequest, AnalyzeResponse, AnswerRequest, AuditPreviewRequest, RewriteRequest
+from app.api.schemas import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    AnswerRequest,
+    AuditPreviewRequest,
+    PitchStudioRequest,
+    RecommendationChangeRequest,
+    RewriteRequest,
+    ScenarioRequest,
+)
 from app.auditing.audit import PitchAuditor
 from app.config import get_settings
 from app.graph.nodes import store
@@ -102,10 +111,40 @@ async def upload_policy(request: Request, filename: str = Query(min_length=1, ma
     (folder / f"{stem}.json").write_text(json.dumps({"original_name": name, "in_comparison": False}), encoding="utf-8")
     return {
         "stored": True,
+        "status": "Uploaded",
+        "selected": False,
         "in_comparison": False,
         "original_name": name,
-        "message": "Stored separately. This file is not part of the four-policy comparison.",
+        "message": "Uploaded. Not ingested and not selected. This file is not part of the four-policy comparison.",
     }
+
+
+@router.get("/policies/uploads")
+def list_uploads():
+    folder = get_settings().storage_path / "uploads"
+    rows = []
+    if folder.exists():
+        for path in sorted(folder.glob("*.json")):
+            try:
+                meta = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                meta = {"original_name": path.stem, "failed": True}
+            rows.append({
+                "original_name": meta.get("original_name") or path.stem,
+                "status": "Failed" if meta.get("failed") else "Uploaded",
+                "selected": False,
+                "in_comparison": False,
+                "message": "Not ingested and not selected. The supplied four-policy comparison is unchanged.",
+            })
+    corpus = []
+    for doc in store().list_policies():
+        corpus.append({
+            "policy_id": doc.policy_id,
+            "policy_name": doc.policy_name,
+            "status": "Ready",
+            "in_comparison": True,
+        })
+    return {"uploads": rows, "corpus": corpus}
 
 
 @router.get("/policies/{policy_id}/document")
@@ -221,6 +260,98 @@ def rewrite(run_id: str, req: RewriteRequest):
         raise HTTPException(502, f"Gemini could not complete the edit; retry in a moment. {exc}")
     audit = _audit_proposed_bullet(st, run_id, Pitch.model_validate(pitch_d), new, req.slide_number, req.text)
     return {"bullet": new.model_dump(), "note": note, "audit": audit}
+
+
+@router.post("/runs/{run_id}/scenario")
+def run_scenario(run_id: str, req: ScenarioRequest):
+    """Coverage Scenario Analysis. Does not change the recommendation."""
+    from app.advisory.scenario import analyse_scenario, books_from_values
+    from app.services.runs import RunNotFound, get_state
+
+    try:
+        state = get_state(run_id)
+    except RunNotFound:
+        raise HTTPException(404, "Run not found")
+    values = state.get("values") or {}
+    docs = {d.policy_id: d.model_dump(mode="json") for d in store().list_policies()}
+    policy_ids = list(values.get("policy_ids") or docs)
+    return analyse_scenario(req.text, policy_ids, books_from_values(values), docs)
+
+
+@router.post("/runs/{run_id}/pitch-studio")
+def pitch_studio(run_id: str, req: PitchStudioRequest):
+    """Propose a structured slide change. Facts stay locked. Nothing is saved until the advisor accepts it through review."""
+    from app.advisory.studio import propose_transformation
+
+    st = store()
+    pitch_d = st.get_artifact(run_id, "pitch")
+    matrix_d = st.get_artifact(run_id, "matrix")
+    pack_d = st.get_artifact(run_id, "evidence_pack")
+    if not pitch_d or not matrix_d:
+        raise HTTPException(404, "The pitch is not ready for the studio yet.")
+    pitch = Pitch.model_validate(pitch_d)
+    slide = next((item for item in pitch.slides if item.slide_number == req.slide_number), None)
+    if slide is None:
+        raise HTTPException(404, "That slide is not in the deck.")
+    names = [doc.policy_name for doc in st.list_policies()]
+    proposal = propose_transformation(slide, req.instruction, pitch, policy_names=names)
+    if not proposal.get("ok"):
+        raise HTTPException(422, proposal.get("message") or "The proposal was refused.")
+    proposed_slide = Slide.model_validate(proposal["slide"])
+    patched = pitch.model_copy(deep=True)
+    patched.slides = [proposed_slide if item.slide_number == req.slide_number else item for item in patched.slides]
+    pack = EvidencePack.model_validate(pack_d) if pack_d else None
+    auditor = PitchAuditor(store=st, matrix=ComparisonMatrix.model_validate(matrix_d))
+    report = auditor.audit(patched, allowed_features=[i.feature_key for i in pack.items] if pack else None, major_gaps=pack.gaps if pack else None)
+    proposal["audit"] = {"gate": report.summary.gate, "supported": report.summary.supported, "contradicted": report.summary.contradicted, "not_found": report.summary.not_found}
+    proposal["audit_blocks_accept"] = report.summary.gate == "FAIL"
+    if isinstance(proposal.get("locks"), dict):
+        proposal["locks"]["AUDIT_LOCK"] = report.summary.gate
+    proposal["acceptable"] = report.summary.gate != "FAIL"
+    return proposal
+
+
+@router.post("/runs/{run_id}/recommendation-change")
+def recommendation_change(run_id: str, req: RecommendationChangeRequest):
+    """Rerun the fit engine. A named policy is applied only when the engine supports it, or as a named override."""
+    from app.advisory.change import consider_recommendation_change
+    from app.advisory.scenario import books_from_values
+    from app.models.fit import ClientRequirement
+    from app.services.runs import RunNotFound, RunStateError, get_state, save_recalculation
+
+    try:
+        state = get_state(run_id)
+    except RunNotFound:
+        raise HTTPException(404, "Run not found")
+    values = state.get("values") or {}
+    docs = {d.policy_id: d for d in store().list_policies()}
+    policy_ids = list(values.get("policy_ids") or docs)
+    requirements = [ClientRequirement.model_validate(item) for item in (values.get("requirements") or [])]
+    current = (values.get("recommendation") or {}).get("recommended_policy_id") or ""
+    try:
+        result = consider_recommendation_change(
+            policy_ids,
+            requirements,
+            books_from_values(values),
+            docs,
+            req.instruction,
+            current_policy_id=current,
+            override=req.override,
+            reviewer=req.reviewer,
+        )
+    except Exception as exc:
+        raise HTTPException(422, f"The recommendation was not changed. {exc}")
+    if not result.get("ok"):
+        raise HTTPException(422, result.get("message") or "The recommendation was not changed.")
+    ready = bool(result.get("applied"))
+    if req.apply:
+        try:
+            result = save_recalculation(run_id, result)
+        except RunStateError as exc:
+            raise HTTPException(409, str(exc))
+    else:
+        result = {**result, "applied": False, "ready_to_apply": ready}
+    return result
 
 
 @router.get("/runs/{run_id}/evidence")

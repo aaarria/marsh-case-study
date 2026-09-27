@@ -65,6 +65,18 @@ export function useDeck(pitch: Pitch | undefined) {
     setPreview(null);
   }, []);
   const patchSlide = useCallback((i: number, patch: Partial<Slide>) => setDraft((d) => (d ? d.map((s, k) => (k === i ? { ...s, ...patch } : s)) : d)), []);
+  const replaceSlide = useCallback(
+    (slide: Slide) => {
+      if (!pitch) return;
+      setDraft((d) => {
+        const base = d ?? (JSON.parse(JSON.stringify(pitch.slides)) as Slide[]);
+        return base.map((item) => (item.slide_number === slide.slide_number ? slide : item));
+      });
+      setPreview(null);
+      focus(slide.slide_number, null);
+    },
+    [pitch, focus],
+  );
   const removeBullet = useCallback(
     (slideNo: number, bi: number) => {
       const base = draft ?? pitch?.slides;
@@ -78,8 +90,8 @@ export function useDeck(pitch: Pitch | undefined) {
   );
 
   return useMemo(
-    () => ({ idx, go, slides, total, draft, dirty, preview, setPreview, activeBullet, setActiveBullet, activeCite, setActiveCite, passport, setPassport, focus, startEdit, discard, patchSlide, removeBullet }),
-    [idx, go, slides, total, draft, dirty, preview, activeBullet, activeCite, passport, focus, startEdit, discard, patchSlide, removeBullet],
+    () => ({ idx, go, slides, total, draft, dirty, preview, setPreview, activeBullet, setActiveBullet, activeCite, setActiveCite, passport, setPassport, focus, startEdit, discard, patchSlide, replaceSlide, removeBullet }),
+    [idx, go, slides, total, draft, dirty, preview, activeBullet, activeCite, passport, focus, startEdit, discard, patchSlide, replaceSlide, removeBullet],
   );
 }
 

@@ -375,7 +375,7 @@ def pitch_node(state: AdvisoryState) -> dict:
         version=version,
         feedback=state.get("regenerate_feedback"),
     )
-    return {"pitch": _dump(pitch), "pitch_warnings": warnings, "regenerate_feedback": None}
+    return {"pitch": _dump(pitch), "pitch_warnings": warnings, "regenerate_feedback": None, "pitch_stale": False}
 
 
 @node("audit_pitch")

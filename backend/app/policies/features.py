@@ -147,6 +147,8 @@ EXPOSURE_KEYWORD_MAP: dict[str, list[str]] = {
     "cancer": ["critical_illness", "modern_treatment"],
     "cardiac": ["critical_illness", "chronic_conditions_day1"],
     "consumable": ["non_medical_expenses_cover"],
+    "non-medical": ["non_medical_expenses_cover"],
+    "exhausted": ["restore_recharge"],
     "out-of-pocket": ["non_medical_expenses_cover", "copay", "room_rent"],
     "retention": ["wellness_renewal_discount", "family_composition", "maternity"],
     "attrition": ["wellness_renewal_discount", "family_composition"],

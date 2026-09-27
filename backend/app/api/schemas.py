@@ -40,6 +40,22 @@ class RewriteRequest(BaseModel):
     source_urls: list[str] = Field(default_factory=list, max_length=12)
 
 
+class ScenarioRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+
+
+class PitchStudioRequest(BaseModel):
+    slide_number: int = Field(ge=1, le=6)
+    instruction: str = Field(min_length=2, max_length=500)
+
+
+class RecommendationChangeRequest(BaseModel):
+    instruction: str = Field(min_length=2, max_length=500)
+    reviewer: str | None = Field(default=None, max_length=120)
+    override: bool = False
+    apply: bool = False
+
+
 class AnswerRequest(BaseModel):
     """Answer to the question a run is paused on. `action` is validated against the question's options server-side."""
 

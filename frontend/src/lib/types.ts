@@ -243,6 +243,7 @@ interface RunValues {
   evidence_pack?: EvidencePack;
   pitch?: Pitch;
   pitch_warnings?: string[];
+  pitch_stale?: boolean;
   audit?: AuditReport;
   audit_history?: (AuditSummary & { pitch_version: number })[];
   review?: { action: string; reviewer?: string | null; note?: string | null; feedback?: string | null };
@@ -310,7 +311,7 @@ export interface AdvisorView {
   why?: { requirement: string; feature?: string | null; priority: string; result: string; page?: number | null; policy_name?: string | null; impact: string; contribution?: number | null; weight?: number | null; chunk_id?: string | null }[];
   comparison?: {
     policies: { policy_id: string; policy_name?: string | null; insurer?: string | null }[];
-    rows: { feature: string; label: string; cells: { policy_id: string; policy_name?: string | null; status_label: string }[] }[];
+    rows: { feature: string; label: string; cells: { policy_id: string; policy_name?: string | null; state?: string; status_label: string }[] }[];
   } | null;
   policy_check?: {
     status: string;
@@ -323,6 +324,64 @@ export interface AdvisorView {
     checked: { challenge: boolean; scenarios: boolean; gaps: boolean };
   } | null;
   audit?: { supported: number; review: number; contradicted: number; not_found: number; gate?: string | null; status_label: string } | null;
+}
+
+export interface ScenarioCell {
+  policy_id: string;
+  policy_name: string;
+  feature: string;
+  state: string;
+  label: string;
+  explanation?: string | null;
+  quote?: string | null;
+  page?: number | null;
+  section?: string | null;
+  chunk_id?: string | null;
+  conditions: string[];
+}
+
+export interface ScenarioResult {
+  ok: boolean;
+  code: string;
+  message: string;
+  scenario?: string;
+  features: string[];
+  rows: { feature: string; label: string; cells: ScenarioCell[] }[];
+  changes_recommendation: boolean;
+}
+
+export interface StudioProposal {
+  ok: boolean;
+  intent?: string | null;
+  wording?: boolean;
+  message: string;
+  slide: Slide;
+  changes?: { index: number; before: string; after: string }[];
+  locks?: { FACT_LOCK?: boolean; NUMBER_LOCK?: boolean; POLICY_LOCK?: boolean; RECOMMENDATION_LOCK?: string; EVIDENCE_LOCK?: string[]; AUDIT_LOCK?: string };
+  acceptable?: boolean;
+  audit?: { gate?: string | null; supported: number; contradicted: number; not_found: number };
+  audit_blocks_accept?: boolean;
+}
+
+export interface RecommendationChangeResult {
+  ok: boolean;
+  applied: boolean;
+  ready_to_apply?: boolean;
+  override?: boolean;
+  supported?: boolean;
+  unchanged?: boolean;
+  message: string;
+  recommendation?: { recommended_policy_id?: string | null; decision_state?: string | null; fit_score?: number | null; policy_name?: string | null };
+  scores?: { policy_id: string; policy_name?: string | null; fit_score?: number | null; decision_state?: string | null }[];
+  gaps?: string[];
+}
+
+export interface PolicyUploadStatus {
+  original_name: string;
+  status: string;
+  selected: boolean;
+  in_comparison: boolean;
+  message: string;
 }
 
 export interface EvidenceLookup {

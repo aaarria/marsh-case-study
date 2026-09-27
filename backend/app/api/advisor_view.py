@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.advisory.states import coverage_label, coverage_state
 from app.policies.features import FEATURE_LABELS
 
 _STATUS = {
@@ -279,7 +280,8 @@ def _comparison(values: dict[str, Any], docs: dict[str, Any]) -> dict[str, Any] 
                 {
                     "policy_id": pid,
                     "policy_name": _name(docs, pid),
-                    "status_label": _STATUS.get(str((by_policy.get(pid) or {}).get("status") or "NOT_FOUND"), "Not established"),
+                    "state": coverage_state(str((by_policy.get(pid) or {}).get("status") or "NOT_FOUND")),
+                    "status_label": coverage_label(coverage_state(str((by_policy.get(pid) or {}).get("status") or "NOT_FOUND"))),
                 }
                 for pid in order
             ],

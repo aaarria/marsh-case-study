@@ -14,7 +14,8 @@
     ],
     "page_flags": {},
     "short_label": "Policy C",
-    "is_group_policy": "NOT_FOUND"
+    "is_group_policy": "NOT_FOUND",
+    "document_hash": "85cdd5a54cc5d7bd"
   },
   {
     "policy_id": "care_supreme",
@@ -31,7 +32,8 @@
     ],
     "page_flags": {},
     "short_label": "Policy B",
-    "is_group_policy": "NOT_FOUND"
+    "is_group_policy": "NOT_FOUND",
+    "document_hash": "32ba87044cf98f1a"
   },
   {
     "policy_id": "hdfc_optima_secure_plus",
@@ -46,7 +48,8 @@
     ],
     "page_flags": {},
     "short_label": "Policy A",
-    "is_group_policy": "NOT_FOUND"
+    "is_group_policy": "NOT_FOUND",
+    "document_hash": "706e4039bf8aa210"
   },
   {
     "policy_id": "niva_reassure_2",
@@ -64,6 +67,7 @@
       "1": "image_only"
     },
     "short_label": "Policy D",
-    "is_group_policy": "NOT_FOUND"
+    "is_group_policy": "NOT_FOUND",
+    "document_hash": "89d8a54c81a23bd4"
   }
 ]

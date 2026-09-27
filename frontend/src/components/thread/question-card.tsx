@@ -174,7 +174,8 @@ export function ReviewQuestion({ runId, q, state, deck, onDone }: { runId: strin
   const judgement = audit.claims.filter((c) => JUDGEMENT.has(c.status));
   const editing = !!deck.draft;
   const needsName = gate === "FAIL" && override && !reviewer.trim();
-  const canApprove = !editing && (gate !== "FAIL" || override) && !needsName;
+  const stale = !!state.values.pitch_stale;
+  const canApprove = !editing && !stale && (gate !== "FAIL" || override) && !needsName;
 
   return (
     <QuestionFrame
@@ -194,7 +195,7 @@ export function ReviewQuestion({ runId, q, state, deck, onDone }: { runId: strin
         Audit · {audit.summary.supported} supported · {audit.summary.partially_supported + audit.summary.uncertain} review · {audit.summary.contradicted} contradicted
         {audit.summary.not_found ? ` · ${audit.summary.not_found} not found` : ""}
       </p>
-      <p className="text-xs text-muted-foreground">Status: {gate === "PASS" ? "Clear to approve" : gate === "FAIL" ? "Blocked until the claims are fixed or you record an override" : "Review required"}</p>
+      <p className="text-xs text-muted-foreground">Status: {stale ? "The recommendation changed. Regenerate the pitch and wait for the new audit before approving." : gate === "PASS" ? "Clear to approve" : gate === "FAIL" ? "Blocked until the claims are fixed or you record an override" : "Review required"}</p>
       <p className={cn("text-sm", `tone-${GATE_TONE[gate] ?? "neutral"} tint-text`)}>
         {gate === "PASS" && `All ${audit.summary.material_claims} material policy claims are supported by the cited brochure text. Company statements and assumptions are labelled.`}
         {gate === "UNCERTAIN" && `${judgement.length} claim${judgement.length === 1 ? "" : "s"} need${judgement.length === 1 ? "s" : ""} your judgement; nothing is contradicted.`}
@@ -263,7 +264,7 @@ export function ReviewQuestion({ runId, q, state, deck, onDone }: { runId: strin
               </>
             ) : (
               <>
-                <Button size="sm" loading={busy === "approve"} disabled={!!busy || !canApprove} title={gate === "FAIL" && !override ? "Acknowledge the failed gate to enable approval" : needsName ? "Overrides are recorded against a reviewer name" : undefined} onClick={() => send("approve", { action: "approve", reviewer: reviewer || undefined, note: note || undefined })}>
+                <Button size="sm" loading={busy === "approve"} disabled={!!busy || !canApprove} title={stale ? "Regenerate the pitch after the recommendation change" : gate === "FAIL" && !override ? "Acknowledge the failed gate to enable approval" : needsName ? "Overrides are recorded against a reviewer name" : undefined} onClick={() => send("approve", { action: "approve", reviewer: reviewer || undefined, note: note || undefined })}>
                   <CheckCircle2 className="size-4" /> Approve &amp; export
                 </Button>
                 <Button size="sm" variant="outline" disabled={!!busy} onClick={() => deck.startEdit(deck.idx + 1)}>

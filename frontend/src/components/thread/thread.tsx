@@ -10,6 +10,8 @@ import { ThreadComposer } from "@/components/thread/composer";
 import { Stream, StreamScope } from "@/components/stream";
 import { CloseCallQuestion, ContextQuestion, ReviewQuestion } from "@/components/thread/question-card";
 import { ComparisonBrief, PolicyCheckBrief, RecommendationBrief } from "@/components/advisor/brief";
+import { ScenarioPanel } from "@/components/advisor/scenario-panel";
+import { RecommendationChange } from "@/components/advisor/recommendation-change";
 import type { Deck } from "@/components/deck/use-deck";
 import { api } from "@/lib/api";
 import { fmtRelative, shortName } from "@/lib/format";
@@ -47,7 +49,7 @@ function formatWait(seconds: number): string {
 }
 
 /** What each completed step says. Uses the latest values; older repeats of a step are summarised from history. */
-function StepMessage({ item, state, policyName, deck }: { item: Extract<ThreadItem, { kind: "step" }>; state: RunState; policyName: (id?: string | null) => string; deck: Deck }) {
+function StepMessage({ item, state, policyName, deck, refresh }: { item: Extract<ThreadItem, { kind: "step" }>; state: RunState; policyName: (id?: string | null) => string; deck: Deck; refresh: () => Promise<void> }) {
   const v = state.values;
   const meta = ts(item.at);
   switch (item.node) {
@@ -110,8 +112,13 @@ function StepMessage({ item, state, policyName, deck }: { item: Extract<ThreadIt
       return <ToolRow icon={FileSearch} summary="Read each brochure separately" meta={meta}><p className="text-xs text-muted-foreground">A passage that was not found stays not established. It is not treated as covered or excluded.</p></ToolRow>;
     case "compare_policies":
       return (
-        <ToolRow icon={Columns3} summary={`Compared ${state.advisor?.comparison?.policies.length ?? v.policy_ids?.length ?? "the"} policies`} meta={meta}>
-          {state.advisor ? <ComparisonBrief view={state.advisor} runId={state.run.run_id} /> : <p className="text-muted-foreground">The comparison is not ready yet.</p>}
+        <ToolRow icon={Columns3} summary={`Compared ${state.advisor?.comparison?.policies.length ?? v.policy_ids?.length ?? "the"} policies`} meta={meta} defaultOpen>
+          {state.advisor ? (
+            <>
+              <ComparisonBrief view={state.advisor} runId={state.run.run_id} />
+              <ScenarioPanel runId={state.run.run_id} />
+            </>
+          ) : <p className="text-muted-foreground">The comparison is not ready yet.</p>}
         </ToolRow>
       );
     case "policy_fit_arena": {
@@ -120,7 +127,12 @@ function StepMessage({ item, state, policyName, deck }: { item: Extract<ThreadIt
       const summary = rec?.automatic && rec.policy_name ? `${rec.policy_name} · ${rec.fit_score}/100` : closeCall ? "The scores need your call" : "No automatic recommendation";
       return (
         <ToolRow icon={Gauge} summary={summary} meta={meta} defaultOpen>
-          {state.advisor ? <RecommendationBrief view={state.advisor} runId={state.run.run_id} /> : <p className="text-xs text-muted-foreground">The recommendation is not ready yet.</p>}
+          {state.advisor ? (
+            <>
+              <RecommendationBrief view={state.advisor} runId={state.run.run_id} />
+              <RecommendationChange runId={state.run.run_id} onChanged={refresh} />
+            </>
+          ) : <p className="text-xs text-muted-foreground">The recommendation is not ready yet.</p>}
         </ToolRow>
       );
     }
@@ -319,7 +331,7 @@ export function Thread({ state, deck, policyName, refresh }: { state: RunState; 
               </UserMessage>
             );
           case "step":
-            return <StepMessage key={i} item={item} state={state} policyName={policyName} deck={deck} />;
+            return <StepMessage key={i} item={item} state={state} policyName={policyName} deck={deck} refresh={refresh} />;
           case "question":
             if (item.answered) return <AnsweredQuestion key={i} item={item} state={state} policyName={policyName} />;
             if (!q || status !== "awaiting_review") return <ToolRow key={i} icon={MessageCircleQuestion} summary={QUESTION_LABEL[item.question]} meta={ts(item.at)} />;

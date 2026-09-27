@@ -13,6 +13,7 @@ import { SlideCanvas } from "@/components/slide-canvas";
 import { SourceChip, SourceQuote } from "@/components/source-ref";
 import { PassportSheet } from "@/components/passport-sheet";
 import { InlineEdit } from "@/components/deck/inline-edit";
+import { PitchStudio } from "@/components/advisor/pitch-studio";
 import { Matrix } from "@/components/matrix";
 import type { Deck } from "@/components/deck/use-deck";
 import { shortName } from "@/lib/format";
@@ -251,6 +252,8 @@ export function DeckPane({ state, deck }: { state: RunState; deck: Deck }) {
                 </>
               )}
             </div>
+
+            <PitchStudio runId={state.run.run_id} slide={slide} canAccept={canAiEdit} deck={deck} />
 
             {editing && (
               <div className="panel space-y-3 p-4">
