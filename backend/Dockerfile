@@ -20,7 +20,6 @@ RUN pip install --upgrade pip && pip install -r /app/backend/requirements.txt
 
 COPY backend /app/backend
 COPY data /app/data
-COPY .env.example /app/.env.example
 # Pre-built indexes + metadata (chunks are rebuilt into SQLite at startup if missing)
 COPY storage/metadata /app/storage/metadata
 COPY storage/vector_index /app/storage/vector_index
