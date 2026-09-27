@@ -272,12 +272,82 @@ export interface Question {
   audit_gate?: string | null;
 }
 
+export interface AdvisorFact {
+  text: string;
+  field?: string | null;
+  label: "VERIFIED" | "ASSUMPTION" | "UNKNOWN" | string;
+}
+
+export interface AdvisorView {
+  error?: string;
+  company?: {
+    company_name?: string | null;
+    industry?: string | null;
+    size?: string | null;
+    footprint?: string | null;
+    characteristics: string[];
+    research_status?: string | null;
+    research_note?: string | null;
+    facts: AdvisorFact[];
+    exposures: { title: string; description: string; label: string; rationale: string }[];
+    market?: { status: string; note: string; context: string; hypotheses: string[] };
+  } | null;
+  recommendation?: {
+    automatic: boolean;
+    policy_id: string;
+    policy_name?: string | null;
+    fit_score?: number | null;
+    evidence_completeness?: number | null;
+    confidence?: string | null;
+    decision_state: string;
+    decision_label: string;
+    wording: string;
+    drivers: string[];
+    gaps: string[];
+    changed_after_check: boolean;
+    scores: { policy_id: string; policy_name?: string | null; fit_score?: number | null; evidence_completeness?: number | null; confidence?: string | null; decision_label: string }[];
+  } | null;
+  why?: { requirement: string; feature?: string | null; priority: string; result: string; page?: number | null; policy_name?: string | null; impact: string; contribution?: number | null; weight?: number | null; chunk_id?: string | null }[];
+  comparison?: {
+    policies: { policy_id: string; policy_name?: string | null; insurer?: string | null }[];
+    rows: { feature: string; label: string; cells: { policy_id: string; policy_name?: string | null; status_label: string }[] }[];
+  } | null;
+  policy_check?: {
+    status: string;
+    stability: string;
+    challenge_found: boolean;
+    challenge?: { requirement: string; feature?: string | null; policy_id?: string | null; policy_name?: string | null; evidence_id?: string | null; explanation: string; materiality: string } | null;
+    scenarios: { scenario: string; requirement: string; feature?: string | null; outcomes: { policy_id?: string | null; policy_name?: string | null; result: string; evidence?: string | null; limitation?: string | null }[]; limitation?: string | null }[];
+    gaps: { kind: string; meaning: string; feature: string; policy_name?: string | null; detail: string; evidence?: string | null }[];
+    note: string;
+    checked: { challenge: boolean; scenarios: boolean; gaps: boolean };
+  } | null;
+  audit?: { supported: number; review: number; contradicted: number; not_found: number; gate?: string | null; status_label: string } | null;
+}
+
+export interface EvidenceLookup {
+  policy_id: string;
+  insurer?: string | null;
+  product?: string | null;
+  source_document?: string | null;
+  page?: number | null;
+  section?: string | null;
+  quote?: string | null;
+  feature: string;
+  feature_label: string;
+  status: string;
+  status_label: string;
+  conditions: string[];
+  chunk_id?: string | null;
+}
+
 export interface RunState {
   run: RunSummary & { outputs?: Record<string, string> };
   values: RunValues;
   pending: string[];
   question?: Question | null;
   events: RunEvent[];
+  advisor?: AdvisorView | null;
 }
 
 export interface Answer {

@@ -13,7 +13,7 @@ export const AUDIT_TONE: Record<AuditStatus, Tone> = {
 
 export const GATE_TONE: Record<string, Tone> = { PASS: "ok", UNCERTAIN: "warn", FAIL: "danger" };
 
-export const KIND_TONE: Record<string, Tone> = { FACT: "ok", INFERENCE: "info", ASSUMPTION: "warn", UNKNOWN: "neutral" };
+export const KIND_TONE: Record<string, Tone> = { FACT: "ok", VERIFIED: "ok", INFERENCE: "info", ASSUMPTION: "warn", UNKNOWN: "neutral" };
 
 const RUN_STATUS_TONE: Record<string, Tone> = {
   running: "info",

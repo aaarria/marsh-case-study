@@ -425,9 +425,16 @@ def human_review_node(state: AdvisoryState) -> dict:
 
 @node("export_outputs")
 def export_node(state: AdvisoryState) -> dict:
+    from app.api.advisor_view import approval_allowed
+
     settings = get_settings()
     pitch = Pitch.model_validate(state["pitch"])
     report = AuditReport.model_validate(state["audit"]) if state.get("audit") else None
+    gate = report.summary.gate if report else None
+    reviewer = ((state.get("review") or {}).get("reviewer") or "").strip()
+    allowed, reason = approval_allowed(gate, reviewer)
+    if not allowed:
+        raise RuntimeError(reason)
     pack = EvidencePack.model_validate(state["evidence_pack"])
     refs: dict[str, SourceRef] = {}
     for it in pack.items:

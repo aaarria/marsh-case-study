@@ -58,11 +58,20 @@ def test_full_run_review_edit_and_approve(client):
     assert "human_review" in st["pending"]
     assert {o["id"] for o in st["question"]["options"]} == {"approve", "edit", "regenerate", "reject"}
     nodes = [e["node"] for e in st["events"]]
-    for n in ["research_company", "confirm_context", "map_exposures", "compare_policies", "policy_fit_arena", "confirm_recommendation", "evidence_pack", "generate_pitch", "audit_pitch"]:
+    for n in ["research_company", "confirm_context", "map_exposures", "compare_policies", "policy_fit_arena", "policy_check", "confirm_recommendation", "evidence_pack", "generate_pitch", "audit_pitch"]:
         assert n in nodes
     assert not any(e["node"] == "confirm_context" and e["status"] == "waiting" for e in st["events"]), "context was given; must not ask"
-    full = client.get(f"/api/runs/{run_id}").json()["values"]
+    body = client.get(f"/api/runs/{run_id}").json()
+    full = body["values"]
+    advisor = body["advisor"]
     assert full["recommendation"]["recommended_policy_id"]
+    assert advisor["recommendation"]["policy_id"] == full["recommendation"]["recommended_policy_id"]
+    assert advisor["recommendation"]["fit_score"] == full["recommendation"]["fit_score"]
+    assert advisor["policy_check"]["status"] in {"COMPLETED", "UNAVAILABLE"}
+    if advisor["policy_check"]["status"] == "COMPLETED":
+        assert advisor["policy_check"]["stability"] == full["policy_check"]["sensitivity"]
+    else:
+        assert advisor["policy_check"]["stability"] == "UNAVAILABLE"
     assert full["audit"]["summary"]["gate"] in {"PASS", "UNCERTAIN", "FAIL"}
     assert any(f.startswith("Retrieval relevance") or "not factual accuracy" in f for f in [full["audit"]["note"]])
     pitch = client.get(f"/api/runs/{run_id}/artifacts/pitch").json()

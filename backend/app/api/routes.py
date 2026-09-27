@@ -1,9 +1,11 @@
 """FastAPI routes."""
 from __future__ import annotations
 
+import json
+import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
 from app.api.schemas import AnalyzeRequest, AnalyzeResponse, AnswerRequest, AuditPreviewRequest, RewriteRequest
@@ -79,6 +81,31 @@ def health():
 @router.get("/policies")
 def list_policies():
     return {"policies": [d.model_dump(mode="json") for d in store().list_policies()]}
+
+
+@router.post("/policies/upload")
+async def upload_policy(request: Request, filename: str = Query(min_length=1, max_length=180)):
+    """Store a brochure beside the supplied corpus. It is not added to the four-policy comparison."""
+    name = Path(filename).name
+    if not name.lower().endswith(".pdf"):
+        raise HTTPException(422, "Only a PDF brochure can be stored. This file was not added.")
+    body = await request.body()
+    if len(body) < 8 or not body.startswith(b"%PDF-"):
+        raise HTTPException(422, "That file is not a readable PDF. Nothing was added to the comparison.")
+    if len(body) > 15 * 1024 * 1024:
+        raise HTTPException(422, "That PDF is larger than 15 MB. Nothing was added to the comparison.")
+    folder = get_settings().storage_path / "uploads"
+    folder.mkdir(parents=True, exist_ok=True)
+    stem = uuid.uuid4().hex
+    path = folder / f"{stem}.pdf"
+    path.write_bytes(body)
+    (folder / f"{stem}.json").write_text(json.dumps({"original_name": name, "in_comparison": False}), encoding="utf-8")
+    return {
+        "stored": True,
+        "in_comparison": False,
+        "original_name": name,
+        "message": "Stored separately. This file is not part of the four-policy comparison.",
+    }
 
 
 @router.get("/policies/{policy_id}/document")
@@ -192,7 +219,60 @@ def rewrite(run_id: str, req: RewriteRequest):
     except LLMError as exc:
         # Transient Gemini failures (503 "high demand" after retries, bad JSON) are the user's to retry, not a server fault.
         raise HTTPException(502, f"Gemini could not complete the edit; retry in a moment. {exc}")
-    return {"bullet": new.model_dump(), "note": note}
+    audit = _audit_proposed_bullet(st, run_id, Pitch.model_validate(pitch_d), new, req.slide_number, req.text)
+    return {"bullet": new.model_dump(), "note": note, "audit": audit}
+
+
+@router.get("/runs/{run_id}/evidence")
+def run_evidence(run_id: str, policy_id: str = Query(min_length=1), feature: str = Query(min_length=1)):
+    """Canonical quote for one comparison cell. Absence is reported; it is not turned into coverage."""
+    from app.api.advisor_view import lookup_evidence
+    from app.services.runs import RunNotFound, get_state
+
+    try:
+        state = get_state(run_id)
+    except RunNotFound:
+        raise HTTPException(404, "Run not found")
+    found = lookup_evidence(state.get("values") or {}, policy_id, feature)
+    if found is None:
+        raise HTTPException(404, "No evidence cell for that policy and feature. That is not the same as an exclusion.")
+    doc = next((d for d in store().list_policies() if d.policy_id == policy_id), None)
+    if doc:
+        found["insurer"] = found.get("insurer") or doc.insurer
+        found["product"] = found.get("product") or doc.policy_name
+        found["source_document"] = found.get("source_document") or doc.file_name
+    return found
+
+
+def _audit_proposed_bullet(st, run_id: str, pitch: Pitch, bullet: SlideBullet, slide_number: int, original: str) -> dict:
+    """Audit one proposed bullet before the advisor can accept it. A failed audit does not apply the edit."""
+    matrix_d = st.get_artifact(run_id, "matrix")
+    pack_d = st.get_artifact(run_id, "evidence_pack")
+    if not matrix_d:
+        return {"status": "UNAVAILABLE", "detail": "The proposed wording could not be audited, so it was not accepted."}
+    patched = pitch.model_copy(deep=True)
+    index = None
+    for slide in patched.slides:
+        if slide.slide_number != slide_number:
+            continue
+        for i, current in enumerate(slide.bullets):
+            if current.text == original:
+                slide.bullets[i] = bullet
+                index = i
+                break
+    if index is None:
+        return {"status": "UNAVAILABLE", "detail": "The proposed wording could not be matched to a bullet, so it was not accepted."}
+    pack = EvidencePack.model_validate(pack_d) if pack_d else None
+    auditor = PitchAuditor(store=st, matrix=ComparisonMatrix.model_validate(matrix_d))
+    try:
+        report = auditor.audit(patched, allowed_features=[i.feature_key for i in pack.items] if pack else None, major_gaps=pack.gaps if pack else None)
+    except Exception as exc:
+        log.warning("rewrite audit failed: %s", exc)
+        return {"status": "UNAVAILABLE", "detail": "The proposed wording could not be audited, so it was not accepted."}
+    match = next((item for item in report.claims if item.claim.slide == slide_number and item.claim.bullet_index == index), None)
+    if match is None:
+        return {"status": "NOT_APPLICABLE", "detail": "This wording is not a policy claim."}
+    return {"status": match.status.value, "detail": match.correction_hint or (match.checks[0].detail if match.checks else "")}
 
 
 @router.post("/runs/{run_id}/answer")

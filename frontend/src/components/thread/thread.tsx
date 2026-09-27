@@ -4,12 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Columns3, Download, FileSearch, Gauge, Globe, Hourglass, ListChecks, MessageCircleQuestion, Presentation, RotateCcw, ShieldCheck, TimerReset, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/callout";
-import { Meter } from "@/components/meter";
 import { GateBadge, KindBadge, StatusPill } from "@/components/status-badge";
 import { AssistantMessage, ChipRow, ToolRow, UserMessage, WorkingRow } from "@/components/thread/message";
 import { ThreadComposer } from "@/components/thread/composer";
 import { Stream, StreamScope } from "@/components/stream";
 import { CloseCallQuestion, ContextQuestion, ReviewQuestion } from "@/components/thread/question-card";
+import { ComparisonBrief, PolicyCheckBrief, RecommendationBrief } from "@/components/advisor/brief";
 import type { Deck } from "@/components/deck/use-deck";
 import { api } from "@/lib/api";
 import { fmtRelative, shortName } from "@/lib/format";
@@ -56,7 +56,10 @@ function StepMessage({ item, state, policyName, deck }: { item: Extract<ThreadIt
       if (!p) return null;
       const reruns = state.events.filter((e) => e.node === "research_company" && e.status === "completed").length;
       if (item.occurrence < reruns - 1) return <ToolRow icon={Globe} summary="Profiled from the name alone (superseded below)" meta={meta} />;
-      const counts = ["FACT", "INFERENCE", "ASSUMPTION", "UNKNOWN"].map((k) => [k, p.facts.filter((f) => f.kind === k).length] as const).filter(([, n]) => n > 0);
+      const company = state.advisor?.company;
+      const counts = company
+        ? (["VERIFIED", "ASSUMPTION", "UNKNOWN"] as const).map((k) => [k, company.facts.filter((f) => f.label === k).length] as const).filter(([, n]) => n > 0)
+        : (["FACT", "INFERENCE", "ASSUMPTION", "UNKNOWN"] as const).map((k) => [k, p.facts.filter((f) => f.kind === k).length] as const).filter(([, n]) => n > 0);
       const webFacts = p.facts.filter((f) => f.kind === "FACT" && f.sources.some((x) => /^https?:/.test(x.url))).length;
       const sourced = webFacts > 0 ? ` · ${webFacts} web-sourced fact${webFacts === 1 ? "" : "s"}` : p.research_status === "OK" ? "" : " · no web sources";
       return (
@@ -71,17 +74,28 @@ function StepMessage({ item, state, policyName, deck }: { item: Extract<ThreadIt
           </div>
           <ChipRow items={[p.industry, p.size, p.geography, p.workforce].filter((x): x is string => !!x && x.toLowerCase() !== "unknown")} />
           {p.research_note && <p className="text-xs text-muted-foreground"><Stream text={p.research_note} /></p>}
+          {company?.market && company.market.status !== "OK" && <p className="text-xs text-muted-foreground">Industry context is unknown. It is not used as a policy score.</p>}
+        </ToolRow>
+      );
+    }
+    case "market_intelligence": {
+      const market = state.advisor?.company?.market;
+      return (
+        <ToolRow icon={Globe} summary="Read the industry context" meta={meta}>
+          <p className="text-xs text-muted-foreground">{market?.context || market?.note || "Industry context is unknown. It does not change the recommendation."}</p>
+          {market?.hypotheses?.length ? <p className="text-xs">Working assumptions only: {market.hypotheses.join(" ")}</p> : null}
         </ToolRow>
       );
     }
     case "map_exposures": {
-      const ex = v.exposures || [];
+      const labelled = state.advisor?.company?.exposures;
+      const ex = labelled || (v.exposures || []).map((e) => ({ title: e.title, description: e.description, label: e.status, rationale: e.reasoning }));
       return (
         <ToolRow icon={ListChecks} summary={`Mapped ${ex.length} health-cover need${ex.length === 1 ? "" : "s"}`} meta={meta}>
           <ul className="space-y-1">
             {ex.slice(0, 6).map((e) => (
-              <li key={e.exposure_id} className="flex items-start gap-2">
-                <KindBadge kind={e.status} className="mt-0.5 shrink-0" />
+              <li key={e.title} className="flex items-start gap-2">
+                <KindBadge kind={e.label} className="mt-0.5 shrink-0" />
                 <span>
                   <span className="text-ink">{e.title}</span> <span className="text-muted-foreground">— <Stream text={e.description} /></span>
                 </span>
@@ -92,40 +106,30 @@ function StepMessage({ item, state, policyName, deck }: { item: Extract<ThreadIt
         </ToolRow>
       );
     }
+    case "policy_intelligence":
+      return <ToolRow icon={FileSearch} summary="Read each brochure separately" meta={meta}><p className="text-xs text-muted-foreground">A passage that was not found stays not established. It is not treated as covered or excluded.</p></ToolRow>;
     case "compare_policies":
       return (
-        <ToolRow icon={Columns3} summary={`Compared ${v.policy_ids?.length ?? "the"} brochures feature by feature`} meta={meta}>
-          <p className="text-muted-foreground">Each brochure was retrieved independently and every cell of the matrix keeps its page and clause. Unknown stays unknown.</p>
+        <ToolRow icon={Columns3} summary={`Compared ${state.advisor?.comparison?.policies.length ?? v.policy_ids?.length ?? "the"} policies`} meta={meta}>
+          {state.advisor ? <ComparisonBrief view={state.advisor} runId={state.run.run_id} /> : <p className="text-muted-foreground">The comparison is not ready yet.</p>}
         </ToolRow>
       );
     case "policy_fit_arena": {
-      const fits = v.fits || [];
-      const rec = v.recommendation;
-      // When a close call followed, the recommendation was the advisor's call, not this step's.
+      const rec = state.advisor?.recommendation;
       const closeCall = state.events.some((e) => e.node === "confirm_recommendation" && e.status === "waiting");
+      const summary = rec?.automatic && rec.policy_name ? `${rec.policy_name} · ${rec.fit_score}/100` : closeCall ? "The scores need your call" : "No automatic recommendation";
       return (
-        <ToolRow icon={Gauge} summary={closeCall ? "Scored policy fit: the top two are within 5 points" : rec ? `Scored policy fit: ${shortName(policyName(rec.recommended_policy_id))} leads at ${rec.fit_score}/100` : "Scored policy fit"} meta={meta}>
-          <ul className="space-y-1.5">
-            {fits.map((f) => (
-              <li key={f.policy_id} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0.5 text-xs">
-                <span className="truncate text-ink">{shortName(policyName(f.policy_id))}</span>
-                <span className="font-mono tabular-nums text-muted-foreground">
-                  {f.score} · {f.confidence.toLowerCase()}
-                </span>
-                <Meter value={f.score / 100} size="xs" className="col-span-2" />
-              </li>
-            ))}
-          </ul>
-          {rec?.caveats.length ? (
-            <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
-              {rec.caveats.slice(0, 3).map((c, i) => (
-                <li key={i}><Stream text={c} /></li>
-              ))}
-            </ul>
-          ) : null}
+        <ToolRow icon={Gauge} summary={summary} meta={meta} defaultOpen>
+          {state.advisor ? <RecommendationBrief view={state.advisor} runId={state.run.run_id} /> : <p className="text-xs text-muted-foreground">The recommendation is not ready yet.</p>}
         </ToolRow>
       );
     }
+    case "policy_check":
+      return (
+        <ToolRow icon={ShieldCheck} summary={state.advisor?.policy_check?.status === "COMPLETED" ? "Policy Check complete" : "Policy Check unavailable"} meta={meta} defaultOpen>
+          {state.advisor ? <PolicyCheckBrief view={state.advisor} runId={state.run.run_id} /> : <p className="text-xs text-muted-foreground">Policy Check did not finish. The recommendation was not stress-tested.</p>}
+        </ToolRow>
+      );
     case "evidence_pack": {
       const pack = v.evidence_pack;
       if (!pack) return null;

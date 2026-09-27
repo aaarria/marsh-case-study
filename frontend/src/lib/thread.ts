@@ -14,7 +14,7 @@ export type ThreadItem =
   | { kind: "outcome"; status: "approved" | "rejected"; at: string };
 
 /** Steps whose completion is worth a message. Bookkeeping nodes (context / close-call checks) only speak when they ask. */
-const SPOKEN = new Set(["research_company", "map_exposures", "compare_policies", "policy_fit_arena", "evidence_pack", "generate_pitch", "audit_pitch", "export_outputs"]);
+const SPOKEN = new Set(["research_company", "market_intelligence", "map_exposures", "policy_intelligence", "compare_policies", "policy_fit_arena", "policy_check", "evidence_pack", "generate_pitch", "audit_pitch", "export_outputs"]);
 
 export function buildThread(state: RunState): ThreadItem[] {
   const items: ThreadItem[] = [];

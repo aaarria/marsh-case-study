@@ -138,6 +138,15 @@ def answer_run(run_id: str, answer: dict[str, Any], background: bool = True) -> 
         options = {"approve", "edit", "regenerate", "reject"}  # checkpoint from before questions carried options
     if answer.get("action") not in options:
         raise RunStateError(f"Answer must be one of: {', '.join(sorted(options))}")
+    if answer.get("action") == "approve":
+        from app.api.advisor_view import approval_allowed
+
+        gate = (((snap.values or {}).get("audit") or {}).get("summary") or {}).get("gate")
+        allowed, reason = approval_allowed(gate, answer.get("reviewer"))
+        if not allowed:
+            raise RunStateError(reason)
+        if gate == "FAIL":
+            answer = {**answer, "advisor_override": True}
     st = store()
 
     def prepare() -> None:
@@ -238,4 +247,12 @@ def get_state(run_id: str) -> dict[str, Any]:
     except Exception as exc:  # pragma: no cover
         log.warning("get_state failed for %s: %s", run_id, exc)
         values, pending, question = {}, [], None
-    return {"run": run, "values": values, "pending": pending, "question": question, "events": st.list_events(run_id)}
+    from app.api.advisor_view import build_advisor_view
+
+    docs = {d.policy_id: d.model_dump(mode="json") for d in st.list_policies()}
+    try:
+        advisor = build_advisor_view(values, docs)
+    except Exception as exc:  # pragma: no cover
+        log.warning("advisor view failed for %s: %s", run_id, exc)
+        advisor = {"error": "The advisor summary could not be prepared. Underlying results were not replaced."}
+    return {"run": run, "values": values, "pending": pending, "question": question, "events": st.list_events(run_id), "advisor": advisor}

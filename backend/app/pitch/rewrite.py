@@ -53,6 +53,9 @@ def rewrite_bullet(pitch: Pitch, pack: EvidencePack | None, slide_number: int, b
         f"COMPANY FACTS (verified; cite the id):\n" + (("\n".join(f"[{c.evidence_id}] {c.text}" for c in pack.company_evidence) or "- none") if pack else "- none") + "\n\n"
         f"EVIDENCE PACK:\n{_pack_text(pack) if pack and pack.items else '- none'}"
     )
+    lowered = instruction.lower()
+    if any(phrase in lowered for phrase in ("change the recommendation", "switch the recommendation", "recommend a different", "different policy")):
+        raise RewriteRefused("A recommendation change is not a wording edit. Reconsider it so the scoring engine can run again, or record an explicit advisor override.")
     out = llm.structured(REWRITE_SYSTEM, user, RewriteOut, purpose="bullet_rewrite", temperature=0.2)
     company_by_id = pack.company_by_id() if pack else {}
     chunk_ids: list[str] = []

@@ -21,7 +21,7 @@ export function InlineEdit({ runId, slide, bulletIndex, onAccept, onClose }: { r
   const [instruction, setInstruction] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [proposal, setProposal] = useState<{ bullet: SlideBullet; note: string | null } | null>(null);
+  const [proposal, setProposal] = useState<{ bullet: SlideBullet; note: string | null; audit?: { status: string; detail: string } } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => inputRef.current?.focus(), []);
 
@@ -38,7 +38,8 @@ export function InlineEdit({ runId, slide, bulletIndex, onAccept, onClose }: { r
       setBusy(false);
     }
   };
-  const accept = () => proposal && onAccept(proposal.bullet);
+  const blocked = proposal?.audit && ["CONTRADICTED", "NOT_FOUND", "UNAVAILABLE"].includes(proposal.audit.status);
+  const accept = () => proposal && !blocked && onAccept(proposal.bullet);
 
   if (!bullet) return null;
   const ops = proposal ? wordDiff(bullet.text, proposal.bullet.text) : null;
@@ -53,7 +54,7 @@ export function InlineEdit({ runId, slide, bulletIndex, onAccept, onClose }: { r
         if (e.key === "Escape") {
           e.stopPropagation();
           onClose();
-        } else if (e.key === "Enter" && proposal && !unchanged) {
+        } else if (e.key === "Enter" && proposal && !unchanged && !blocked) {
           // ↵ accepts from anywhere in the proposal view; Refine/Reject keep their own Enter when focused.
           if (e.target instanceof HTMLButtonElement && !e.target.dataset.accept) return;
           e.preventDefault();
@@ -90,10 +91,11 @@ export function InlineEdit({ runId, slide, bulletIndex, onAccept, onClose }: { r
             <span>{proposal.bullet.source_chunk_ids.length ? `${proposal.bullet.source_chunk_ids.length} source(s) cited` : proposal.bullet.kind === "policy" ? "no source" : "no source needed"}</span>
             {bullet.source_chunk_ids.length > 0 && proposal.bullet.source_chunk_ids.length < bullet.source_chunk_ids.length && <span className="tone-warn tint-text">drops a citation</span>}
             {proposal.note && <span className="tone-warn tint-text">{proposal.note}</span>}
+            {proposal.audit && <span className={blocked ? "tone-danger tint-text" : ""}>Audit: {proposal.audit.status.replaceAll("_", " ").toLowerCase()}{proposal.audit.detail ? ` — ${proposal.audit.detail}` : ""}</span>}
             {unchanged && <span>No change proposed.</span>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={accept} disabled={!!unchanged} autoFocus data-accept>
+            <Button size="sm" onClick={accept} disabled={!!unchanged || !!blocked} autoFocus data-accept>
               <Check className="size-4" /> Accept <Kbd className="ml-1 border-white/20 bg-white/10 text-canvas">↵</Kbd>
             </Button>
             <Button size="sm" variant="outline" onClick={() => setProposal(null)}>

@@ -31,6 +31,7 @@ export default function Composer() {
   const [priorities, setPriorities] = useState<string[]>([]);
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -162,6 +163,28 @@ export default function Composer() {
                 ))}
               </ChipGroup>
               {tooFew && <p className="tone-danger tint-text mt-1.5 text-xs">Keep at least {MIN_POLICIES} policies: a recommendation needs something to be compared against.</p>}
+              <label className="mt-2 inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="sr-only"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    setError(null);
+                    try {
+                      const stored = await api.uploadPolicy(file);
+                      setUploadNote(stored.message);
+                    } catch (err) {
+                      setUploadNote(null);
+                      setError(err instanceof ApiError ? err.message : "That file could not be stored.");
+                    }
+                  }}
+                />
+                Store another PDF separately
+              </label>
+              {uploadNote && <p className="mt-1.5 text-xs text-muted-foreground">{uploadNote}</p>}
             </div>
           </form>
 

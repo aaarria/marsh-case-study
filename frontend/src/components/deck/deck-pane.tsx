@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 const ISSUE = new Set<AuditStatus>(["CONTRADICTED", "NOT_FOUND"]);
 const JUDGEMENT = new Set<AuditStatus>(["PARTIALLY_SUPPORTED", "UNCERTAIN"]);
-const STEPS = ["research_company", "map_exposures", "compare_policies", "policy_fit_arena", "evidence_pack", "generate_pitch"];
+const STEPS = ["research_company", "map_exposures", "compare_policies", "policy_fit_arena", "policy_check", "generate_pitch"];
 const KIND_HINT: Record<string, string> = { policy: "Policy claim: audited against the cited brochure text", company: "Company statement", recommendation: "Recommendation / comparison", assumption: "Labelled assumption", marsh: "Marsh positioning" };
 
 /** Before there is a deck: what is done and what is running, so the empty pane still informs. */

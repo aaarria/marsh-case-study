@@ -190,6 +190,11 @@ export function ReviewQuestion({ runId, q, state, deck, onDone }: { runId: strin
         </span>
       }
     >
+      <p className="text-sm text-ink">
+        Audit · {audit.summary.supported} supported · {audit.summary.partially_supported + audit.summary.uncertain} review · {audit.summary.contradicted} contradicted
+        {audit.summary.not_found ? ` · ${audit.summary.not_found} not found` : ""}
+      </p>
+      <p className="text-xs text-muted-foreground">Status: {gate === "PASS" ? "Clear to approve" : gate === "FAIL" ? "Blocked until the claims are fixed or you record an override" : "Review required"}</p>
       <p className={cn("text-sm", `tone-${GATE_TONE[gate] ?? "neutral"} tint-text`)}>
         {gate === "PASS" && `All ${audit.summary.material_claims} material policy claims are supported by the cited brochure text. Company statements and assumptions are labelled.`}
         {gate === "UNCERTAIN" && `${judgement.length} claim${judgement.length === 1 ? "" : "s"} need${judgement.length === 1 ? "s" : ""} your judgement; nothing is contradicted.`}

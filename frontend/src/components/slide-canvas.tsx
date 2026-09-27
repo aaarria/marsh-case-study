@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { AuditStatus, Slide, SlideBullet, SourceRef } from "@/lib/types";
 import { Stream } from "@/components/stream";
 import { shortName } from "@/lib/format";
+import { splitBullet } from "@/lib/slide-text";
 import { cn } from "@/lib/utils";
 
 /** Per-slide footnote numbering: unique chunk ids in order of first appearance. */
@@ -12,28 +13,6 @@ function slideCitations(slide: Slide): string[] {
   const seen: string[] = [];
   for (const b of slide.bullets) for (const c of b.source_chunk_ids) if (!seen.includes(c)) seen.push(c);
   return seen;
-}
-
-const GENERIC = new Set(["TITLE", "EXPOSURE", "CARD", "BENEFIT", "ITEM", "POINT", "LABEL"]);
-
-function splitBullet(text: string): { label: string; body: string } {
-  let raw = text.trim();
-  for (const prefix of ["assumption:", "why this policy:", "watch-out:"]) {
-    if (raw.toLowerCase().startsWith(prefix)) raw = raw.slice(prefix.length).trim();
-  }
-  let label = "";
-  let body = raw;
-  if (raw.includes("|")) {
-    const [a, b] = raw.split("|", 2);
-    label = a.trim();
-    body = b.trim();
-  } else if (raw.includes(":") && raw.split(":", 1)[0].length <= 36) {
-    const [a, b] = raw.split(":", 2);
-    label = a.trim();
-    body = b.trim();
-  }
-  if (!label || GENERIC.has(label.toUpperCase()) || body.toLowerCase() === label.toLowerCase()) return { label: body, body: "" };
-  return { label, body };
 }
 
 function clientLine(title: string, subtitle: string | null | undefined, facts: { label: string; body: string }[]): string {
