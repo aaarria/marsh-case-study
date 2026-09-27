@@ -11,6 +11,11 @@ from app.policy_fit.requirements import assign_weights
 from app.policy_fit.scoring import recommend, score_policies
 
 VAGUE = "Your request did not specify a measurable requirement change."
+SOLE_PRIORITY = (
+    "The relative priority cannot be reduced while it is the only active client priority. "
+    "Its share of the client-priority pool stays the same, so the fit was not recalculated."
+)
+NO_WEIGHT_CHANGE = "The effective weights and policy calculations are unchanged, so no recommendation recalculation was applied."
 
 
 def consider_recommendation_change(
@@ -60,6 +65,28 @@ def consider_recommendation_change(
         "alternatives": [item.model_dump(mode="json") for item in provisional.alternatives],
         "decision_state": provisional.decision_state,
     }
+    decrease_requested = any(op == "decrease" for op, _features in (ops or []))
+    if decrease_requested and _weights_unchanged(old_rows, updated) and _scores_unchanged(old_fits, fits):
+        active = [
+            item for item in old_rows
+            if item.requirement_class in {RequirementClass.PREFERENCE, RequirementClass.MUST_HAVE} and item.weight > 0
+        ]
+        return {
+            **payload,
+            "new_weights": _weights(old_rows),
+            "scores": _scores(old_fits, docs),
+            "recommendation": None if old_rec is None else old_rec.model_dump(mode="json"),
+            "requirements": [item.model_dump(mode="json") for item in old_rows],
+            "fits": [fit.model_dump(mode="json") for fit in old_fits],
+            "alternatives": [] if old_rec is None else [item.model_dump(mode="json") for item in old_rec.alternatives],
+            "decision_state": None if old_rec is None else old_rec.decision_state,
+            "ok": True,
+            "applied": False,
+            "override": False,
+            "supported": False,
+            "unchanged": True,
+            "message": SOLE_PRIORITY if len(active) <= 1 else NO_WEIGHT_CHANGE,
+        }
     if requested and provisional.recommended_policy_id != requested:
         gaps = next((fit.must_have_gaps + fit.unresolved_must_haves + fit.comparison_incomplete for fit in fits if fit.policy_id == requested), [])
         if override and (reviewer or "").strip() and requested in {fit.policy_id for fit in fits}:
@@ -173,6 +200,27 @@ def _preference(feature: str, weight: float) -> ClientRequirement:
         accept_add_on=True,
         coverage_expectation=CoverageExpectation.EITHER,
     )
+
+
+def _weights_unchanged(before: list[ClientRequirement], after: list[ClientRequirement]) -> bool:
+    return _weight_key(before) == _weight_key(after)
+
+
+def _weight_key(requirements: list[ClientRequirement]) -> tuple:
+    return tuple(sorted(
+        (item.feature, round(float(item.weight), 6), item.requirement_class.value)
+        for item in requirements
+        if item.weight > 0
+    ))
+
+
+def _scores_unchanged(before, after) -> bool:
+    def key(fits):
+        return tuple(sorted(
+            (fit.policy_id, fit.score, fit.evidence_completeness, fit.decision_state, fit.decision_sufficient)
+            for fit in fits
+        ))
+    return key(before) == key(after)
 
 
 def _weights(requirements: list[ClientRequirement]) -> list[dict[str, Any]]:

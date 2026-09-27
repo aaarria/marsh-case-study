@@ -200,6 +200,69 @@ def test_scenario_cannot_force_an_insurer_and_keeps_missing_evidence_missing():
     assert cells["p1"] == "EXCLUDED" and cells["p2"] == "NOT_ESTABLISHED"
 
 
+def test_priority_decrease_changes_a_shared_pool_and_does_not_invent_a_sole_reduction():
+    from app.advisory.change import SOLE_PRIORITY
+    from app.policy_fit.criteria import criterion_type_for
+
+    def pref(feature: str, weight: float = 1.0) -> ClientRequirement:
+        return ClientRequirement(
+            requirement_id=feature,
+            description=feature.replace("_", " "),
+            feature=feature,
+            type=criterion_type_for(feature),
+            priority_weight=weight,
+            requirement_class=RequirementClass.PREFERENCE,
+            source="test",
+            client_asked=True,
+            accept_add_on=True,
+            coverage_expectation=CoverageExpectation.EITHER,
+        )
+
+    ids = ["p1", "p2"]
+    docs = {"p1": _doc("p1", "Alpha Cover"), "p2": _doc("p2", "Beta Cover")}
+    books = _books({
+        "p1": [
+            _fact("p1", "maternity", CoverageStatus.COVERED, "Maternity is covered."),
+            _fact("p1", "global_cover", CoverageStatus.CONDITIONAL, "Global cover applies abroad on a plan variant."),
+        ],
+        "p2": [
+            _fact("p2", "maternity", CoverageStatus.EXCLUDED, "Maternity is not covered."),
+            _fact("p2", "global_cover", CoverageStatus.COVERED, "Global cover is included."),
+        ],
+    })
+    both = assign_weights([pref("maternity"), pref("global_cover")])
+    reduced = consider_recommendation_change(ids, both, books, docs, "Reduce the importance of global treatment.")
+    assert reduced["applied"] is True
+    old = {row["feature"]: row["weight"] for row in reduced["old_weights"]}
+    new = {row["feature"]: row["weight"] for row in reduced["new_weights"]}
+    assert new["global_cover"] < old["global_cover"]
+    assert new["maternity"] > old["maternity"]
+    assert reduced["scores"] != reduced["old_scores"]
+    again = consider_recommendation_change(ids, both, books, docs, "Reduce the importance of global treatment.")
+    assert again["scores"] == reduced["scores"]
+    assert again["recommendation"]["recommended_policy_id"] == reduced["recommendation"]["recommended_policy_id"]
+
+    only = assign_weights([pref("global_cover")])
+    sole = consider_recommendation_change(ids, only, books, docs, "Reduce the importance of global treatment.")
+    assert sole["ok"] is True and sole["applied"] is False
+    assert sole["message"] == SOLE_PRIORITY
+    assert sole["new_weights"] == sole["old_weights"]
+    assert sole["scores"] == sole["old_scores"]
+
+    added = consider_recommendation_change(ids, only, books, docs, "Add maternity as a client priority.")
+    assert added["applied"] is True
+    assert any(row["feature"] == "maternity" for row in added["new_weights"])
+    assert added["scores"] != added["old_scores"]
+
+    without = assign_weights([pref("global_cover")])
+    fit_without = score_policies(ids, without, books, [])
+    fit_with = score_policies(ids, both, books, [])
+    assert {fit.policy_id: fit.score for fit in fit_without} != {fit.policy_id: fit.score for fit in fit_with}
+    forward = recommend(fit_with, [], docs).recommended_policy_id
+    reverse = recommend(score_policies(list(reversed(ids)), both, books, []), [], docs).recommended_policy_id
+    assert forward == reverse
+
+
 def test_phase5_routes_and_advisor_files_stay_symmetric(retriever):
     from pathlib import Path
 

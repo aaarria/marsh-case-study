@@ -9,7 +9,7 @@ from itertools import permutations
 import pytest
 
 from app.models.fit import ClientRequirement, CoverageExpectation, RequirementClass
-from app.models.policy import CoverageStatus, FeatureFact
+from app.models.policy import CoverageStatus, FeatureFact, SourceRef
 from app.policies.conditions import canonicalize_results
 from app.policies.extraction import get_policy_facts
 from app.policy_fit.criteria import compare_fact, criterion_type_for
@@ -86,12 +86,70 @@ def test_room_rent_wordings_score_differently_without_a_policy_identity():
     assert renamed.score == actuals.score
 
 
+def test_no_capping_beats_a_generic_sum_insured_ceiling_and_keeps_a_room_rent_limit():
+    from itertools import permutations
+
+    req = assign_weights([_req("room_rent", "No room rent capping")])[0]
+    req.type = criterion_type_for("room_rent")
+    body = "on hospitalization expenses, procedures & benefits such as room rent, ICU charges, and a lot more, up to your Base Sum Insured."
+    no_cap = _fact(
+        "room_rent",
+        CoverageStatus.COVERED,
+        value=body,
+        quote=body,
+        sources=[SourceRef(policy_id="synthetic", chunk_id="c-nocap", page=1, section="NO CAPPING", source_text=body)],
+    )
+    up_to_si = _fact("room_rent", CoverageStatus.COVERED, value="Room Rent: Up to SI", quote="Room Rent: Up to SI")
+    actuals = _fact("room_rent", CoverageStatus.COVERED, value="Room Rent: At actuals", quote="Room Rent: At actuals")
+    missing = _fact("room_rent", CoverageStatus.NOT_FOUND, value=None, quote=None)
+    judged = {
+        "no_cap": compare_fact(req, no_cap),
+        "up_to_si": compare_fact(req, up_to_si),
+        "actuals": compare_fact(req, actuals),
+        "missing": compare_fact(req, missing),
+    }
+    assert judged["no_cap"].score == 100
+    assert "no separate room-rent cap" in judged["no_cap"].note.lower()
+    assert judged["no_cap"].status == CoverageStatus.COVERED
+    assert judged["up_to_si"].score == 75
+    assert judged["actuals"].score == 100
+    assert judged["missing"].score is None and judged["missing"].status == CoverageStatus.NOT_FOUND
+    books = {
+        "p1": {"room_rent": no_cap},
+        "p2": {"room_rent": up_to_si},
+        "p3": {"room_rent": actuals},
+        "p4": {"room_rent": missing},
+    }
+    from app.models.policy import PolicyExtractionResult
+    from datetime import datetime, timezone
+
+    stamped = datetime.now(timezone.utc).isoformat()
+    results = {
+        pid: PolicyExtractionResult(policy_id=pid, facts=facts, generated_at=stamped)
+        for pid, facts in books.items()
+    }
+    signatures = set()
+    for order in permutations(results):
+        fits = score_policies(list(order), [req], results)
+        rec = recommend(fits, [], {})
+        signatures.add((
+            tuple(sorted((fit.policy_id, fit.score, fit.evidence_completeness, fit.decision_sufficient) for fit in fits)),
+            rec.recommended_policy_id,
+            rec.decision_state,
+            tuple(item.policy_id for item in rec.alternatives),
+        ))
+    assert len(signatures) == 1
+
+
 def test_four_brochures_normalize_the_same_concepts_under_different_names(books):
     abhi, care, hdfc, niva = (books[pid] for pid in POLICIES)
 
     assert "room rent" in (abhi.facts["room_rent"].value or "").lower()
     assert "base sum insured" in (abhi.facts["room_rent"].value or "").lower()
-    assert _score(books, "room_rent", "abhi_activ_one", "No room rent capping").score == 75
+    assert abhi.facts["room_rent"].sources[0].section == "NO CAPPING"
+    abhi_room = _score(books, "room_rent", "abhi_activ_one", "No room rent capping")
+    assert abhi_room.score == 100
+    assert abhi_room.status == CoverageStatus.COVERED
     assert "up to si" in (care.facts["room_rent"].value or "").lower()
     assert _score(books, "room_rent", "care_supreme", "No room rent capping").score == 75
     assert "at actuals" in (hdfc.facts["room_rent"].value or "").lower()
@@ -164,10 +222,14 @@ def test_four_brochures_normalize_the_same_concepts_under_different_names(books)
 
 def test_client_profiles_change_the_recommendation(books):
     room, rec_a = _profile(books, [_req("room_rent", "No room rent capping", weight=1.8), _hospital()])
-    assert rec_a.recommended_policy_id == "hdfc_optima_secure_plus"
-    assert rec_a.decision_state == "eligible"
+    assert rec_a.recommended_policy_id == ""
+    assert rec_a.decision_state == "close_decision"
     assert room["hdfc_optima_secure_plus"].score == 100
-    assert room["abhi_activ_one"].score == room["care_supreme"].score == 83.75
+    assert room["abhi_activ_one"].score == 100
+    assert _cell(room["abhi_activ_one"], "room_rent").criterion_score == 100
+    assert _cell(room["abhi_activ_one"], "room_rent").source_section == "NO CAPPING"
+    assert room["care_supreme"].score == 83.75
+    assert _cell(room["care_supreme"], "room_rent").criterion_score == 75
     assert _cell(room["niva_reassure_2"], "room_rent").criterion_score is None
     assert room["niva_reassure_2"].decision_sufficient is False
 
@@ -236,7 +298,8 @@ def test_weight_and_requirement_changes_move_the_result(books):
         _req("maternity", "Maternity benefits", weight=20),
         _hospital(),
     ])
-    assert rec_room.recommended_policy_id == "hdfc_optima_secure_plus"
+    assert rec_room.recommended_policy_id == ""
+    assert rec_room.decision_state == "close_decision"
     assert rec_mat.recommended_policy_id == "abhi_activ_one"
     assert room_heavy["hdfc_optima_secure_plus"].score > maternity_heavy["hdfc_optima_secure_plus"].score
 
@@ -289,11 +352,12 @@ def test_priority_combinations_change_scores_and_can_change_the_primary(books):
         _hospital(),
     ])
     assert room["hdfc_optima_secure_plus"].score != both["hdfc_optima_secure_plus"].score
-    assert rec_room.recommended_policy_id == "hdfc_optima_secure_plus"
+    assert rec_room.decision_state == "close_decision"
+    assert rec_room.recommended_policy_id == ""
+    assert {item.policy_id for item in rec_room.alternatives} >= {"abhi_activ_one", "hdfc_optima_secure_plus"}
     assert rec_chronic.recommended_policy_id == "abhi_activ_one"
-    assert rec_both.decision_state == "close_decision"
-    assert rec_both.recommended_policy_id == ""
-    assert {item.policy_id for item in rec_both.alternatives} >= {"abhi_activ_one", "hdfc_optima_secure_plus"}
+    assert rec_both.recommended_policy_id == "abhi_activ_one"
+    assert rec_both.decision_state == "eligible"
     assert rec_global.recommended_policy_id != rec_chronic.recommended_policy_id or room_global["abhi_activ_one"].score != chronic["abhi_activ_one"].score
     assert any(not fit.decision_sufficient for fit in room.values())
     assert {item.policy_id for item in rec_room.alternatives}.isdisjoint({"niva_reassure_2"}) or all(

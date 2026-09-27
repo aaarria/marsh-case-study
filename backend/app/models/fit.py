@@ -81,6 +81,7 @@ class CriterionScore(BaseModel):
     status: str
     evidence: str | None = None
     source_page: int | None = None
+    source_section: str | None = None
     source_chunk_id: str | None = None
     must_have_gap: bool = False
     explicit_exclusion: bool = False

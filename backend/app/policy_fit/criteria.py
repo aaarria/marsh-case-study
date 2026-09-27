@@ -11,6 +11,7 @@ Retrieval relevance is never an input.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 
 from app.models.fit import ClientRequirement, CoverageExpectation, CriterionType
@@ -90,8 +91,8 @@ COMPARATOR_RULES: dict[str, dict[str, str]] = {
         "unit": "INR or at-actuals flag",
         "target": "no sub-limit / at actuals",
         "direction": "uncapped is better than a cap",
-        "full_fit": "at actuals, or no room-rent cap that is not also an SI ceiling, scores covered_score",
-        "partial_fit": "covered up to sum insured scores room_rent_up_to_si_score; a numeric cap scores sublimit_cap_score",
+        "full_fit": "at actuals, or an explicit no-capping / no room-rent sub-limit, scores covered_score. A generic sum-insured ceiling does not override that.",
+        "partial_fit": "a room-rent line that itself says up to sum insured scores room_rent_up_to_si_score; a numeric cap scores sublimit_cap_score",
         "failure": "EXCLUDED scores failed_score",
         "missing_evidence": "unquantified text is capped at sublimit_unquantified_cap; missing status scores None",
         "exception": "A named condition caps the score once",
@@ -554,17 +555,74 @@ def _wants_cost_lever(requirement: ClientRequirement) -> bool:
     return any(phrase in text for phrase in ("cost control", "co-pay option", "copay option", "deductible option"))
 
 
+# A room-rent label followed immediately by an SI ceiling is that benefit's own limit.
+# A later "up to the base sum insured" on a list of benefits is the overall policy ceiling.
+_ROOM_RENT_SI = re.compile(
+    r"room rent\s*[:|]\s*up to (?:the |your )?(?:base )?(?:sum insured|si)\b"
+    r"|room rent\s+up to (?:the |your )?(?:base )?(?:sum insured|si)\b",
+    re.I,
+)
+_GENERIC_SI = (
+    "up to si",
+    "up to sum insured",
+    "up to the sum insured",
+    "covered up to sum insured",
+    "up to your base sum insured",
+    "up to the base sum insured",
+)
+_NO_ROOM_CAP = (
+    "no capping",
+    "no cap on room",
+    "no room rent cap",
+    "no room-rent cap",
+    "no room rent sub-limit",
+    "no room-rent sub-limit",
+    "no sub-limit",
+    "no sublimit",
+    "without any capping",
+    "without capping",
+    "uncapped",
+    "unlimited",
+)
+
+
+def _room_rent_context(fact: FeatureFact) -> tuple[str, str]:
+    """Cited section and brochure text. Notes and insurer identity are not evidence."""
+    sections: list[str] = []
+    if fact.source_section:
+        sections.append(fact.source_section)
+    for src in fact.sources:
+        if src.section and src.section not in sections:
+            sections.append(src.section)
+    section = " ".join(sections).lower()
+    body = " ".join(
+        part for part in (fact.limit, fact.limit_original_text, fact.original_quote, fact.value, fact.sublimit) if part
+    ).lower()
+    return section, body
+
+
 def _sublimit(requirement: ClientRequirement, fact: FeatureFact, status: CoverageStatus, cfg: ScoringConfig) -> tuple[float, str]:
-    text = " ".join(x for x in (fact.limit, fact.original_quote, fact.value, fact.sublimit) if x).lower()
-    up_to_si = any(token in text for token in (
-        "up to si", "up to sum insured", "up to the sum insured", "covered up to sum insured", "up to your base sum insured",
-    ))
-    if any(token in text for token in ("at actual",)):
-        return cfg.covered_score, "Room rent is at actuals. That is not the same as a sum-insured ceiling."
-    if up_to_si:
-        return cfg.room_rent_up_to_si_score, "Room rent is covered up to the sum insured. That is a ceiling, not at-actuals."
-    if any(token in text for token in ("no sub-limit", "no sublimit", "no capping", "unlimited")):
-        return cfg.covered_score, "No separate room-rent cap is stated."
+    """Distinguish a room-rent cap from the policy's overall sum-insured ceiling.
+
+    Explicit no-capping, no room-rent sub-limit, or at-actuals wording wins over a generic
+    statement that benefits are payable up to the base sum insured. A room-rent line that
+    itself says "up to SI" remains a room-rent ceiling.
+    """
+    section, body = _room_rent_context(fact)
+    combined = f"{section} {body}".strip()
+    room_specific_si = bool(_ROOM_RENT_SI.search(body))
+    generic_si = any(token in body for token in _GENERIC_SI)
+    no_cap = any(token in combined for token in _NO_ROOM_CAP)
+    cited = f" Cited section: {section}." if section else ""
+    if "at actual" in combined:
+        return cfg.covered_score, "Room rent is at actuals. That is not the same as a sum-insured ceiling." + cited
+    if no_cap and not room_specific_si:
+        return cfg.covered_score, (
+            "No separate room-rent cap is stated. A generic sum-insured ceiling on the overall benefit is not a room-rent cap."
+            + cited
+        )
+    if room_specific_si or generic_si:
+        return cfg.room_rent_up_to_si_score, "Room rent is covered up to the sum insured. That is a ceiling, not at-actuals." + cited
     if fact.limit_numeric is not None or (fact.limit and any(ch.isdigit() for ch in fact.limit)):
         return cfg.sublimit_cap_score, "A sub-limit or cap is stated."
     base, note = _coverage(status, cfg)

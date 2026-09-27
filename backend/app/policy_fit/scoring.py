@@ -134,14 +134,17 @@ def _one(policy_id: str, requirements: list[ClientRequirement], book: dict[str, 
         judgement = compare_fact(req, fact, config)
         evidence = None
         page = None
+        section = None
         chunk = None
         if fact is not None and fact.sources:
             evidence = fact.original_quote or fact.sources[0].source_text
             page = fact.sources[0].page
+            section = fact.sources[0].section or fact.source_section
             chunk = fact.sources[0].chunk_id
         elif fact is not None:
             evidence = fact.original_quote or fact.value
             page = fact.source_page
+            section = fact.source_section
             chunk = fact.source_chunk_id
         rows.append(
             CriterionScore(
@@ -155,6 +158,7 @@ def _one(policy_id: str, requirements: list[ClientRequirement], book: dict[str, 
                 status=judgement.status.value,
                 evidence=evidence,
                 source_page=page,
+                source_section=section,
                 source_chunk_id=chunk,
                 must_have_gap=judgement.must_have_gap,
                 explicit_exclusion=judgement.explicit_exclusion,
