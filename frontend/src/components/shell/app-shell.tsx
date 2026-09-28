@@ -43,7 +43,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
 
   return (
     <div className="flex h-dvh bg-canvas">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-[#e4ddd6] bg-marsh-cream text-marsh-navy">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-[#e4ddd6] bg-canvas text-marsh-navy">
         <div className="flex h-16 items-center px-5">
           <Link href="/" className="focus-ring flex items-center rounded-md" aria-label="Marsh Health Policy Advisory, home">
             <Image src="/marsh-wordmark.png" alt="Marsh" width={1029} height={227} priority className="h-7 w-auto border-0 bg-transparent shadow-none" />
@@ -90,7 +90,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-        <footer className="flex h-8 shrink-0 items-center gap-3 border-t border-hairline bg-marsh-cream px-4 text-2xs text-quiet" aria-label="System status">
+        <footer className="flex h-8 shrink-0 items-center gap-3 border-t border-hairline bg-canvas px-4 text-2xs text-quiet" aria-label="System status">
           <span className="flex items-center gap-1.5">
             <Matrix variant="scan" state={r.error ? "error" : working ? "working" : r.llmOffline ? "idle" : "done"} title={r.error ? "API unreachable" : working ? "Working" : "Ready"} />
             <span className={cn(working && "t-shimmer")}>{r.error ? "API unreachable" : working ? "Working…" : r.loading ? "Connecting…" : "Ready"}</span>

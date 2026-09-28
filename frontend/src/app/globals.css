@@ -77,7 +77,7 @@
    Light Marsh chrome. Navy is reserved for actions, selection, and the logo.
    --------------------------------------------------------------------------- */
 :root {
-  --canvas:   var(--marsh-cream);
+  --canvas:   #faf9f7;
   --panel:    var(--marsh-white);
   --surface:  var(--marsh-white);
   --raised:   #efece6;
