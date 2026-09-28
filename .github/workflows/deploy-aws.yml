@@ -1,0 +1,110 @@
+name: Deploy API to AWS
+
+# This branch only. main stays the Render and Vercel production deploy.
+on:
+  push:
+    branches: [aws]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: marsh-api
+  SERVICE_NAME: marsh-advisory-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require AWS and Groq secrets
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          test -n "$AWS_ACCESS_KEY_ID" || { echo "Add GitHub secret AWS_ACCESS_KEY_ID"; exit 1; }
+          test -n "$AWS_SECRET_ACCESS_KEY" || { echo "Add GitHub secret AWS_SECRET_ACCESS_KEY"; exit 1; }
+          test -n "$GROQ_API_KEY" || { echo "Add GitHub secret GROQ_API_KEY"; exit 1; }
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: account
+        run: echo "id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure ECS roles
+        run: |
+          set -euo pipefail
+          if ! aws iam get-role --role-name ecsTaskExecutionRole >/dev/null 2>&1; then
+            aws iam create-role --role-name ecsTaskExecutionRole --assume-role-policy-document '{
+              "Version": "2012-10-17",
+              "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"Service": "ecs-tasks.amazonaws.com"},
+                "Action": "sts:AssumeRole"
+              }]
+            }'
+          fi
+          aws iam attach-role-policy --role-name ecsTaskExecutionRole \
+            --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+          if ! aws iam get-role --role-name ecsInfrastructureRoleForExpressServices >/dev/null 2>&1; then
+            aws iam create-role --role-name ecsInfrastructureRoleForExpressServices --assume-role-policy-document '{
+              "Version": "2012-10-17",
+              "Statement": [{
+                "Sid": "AllowAccessInfrastructureForECSExpressServices",
+                "Effect": "Allow",
+                "Principal": {"Service": "ecs.amazonaws.com"},
+                "Action": "sts:AssumeRole"
+              }]
+            }'
+          fi
+          aws iam attach-role-policy --role-name ecsInfrastructureRoleForExpressServices \
+            --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices
+          sleep 20
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push the API image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1 \
+            || aws ecr create-repository --repository-name "$ECR_REPOSITORY" >/dev/null
+          docker build -f backend/Dockerfile -t "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+          docker push "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - id: service
+        uses: aws-actions/amazon-ecs-deploy-express-service@v1
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        with:
+          service-name: ${{ env.SERVICE_NAME }}
+          image: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          execution-role-arn: arn:aws:iam::${{ steps.account.outputs.id }}:role/ecsTaskExecutionRole
+          infrastructure-role-arn: arn:aws:iam::${{ steps.account.outputs.id }}:role/ecsInfrastructureRoleForExpressServices
+          container-port: 8000
+          cpu: "1024"
+          memory: "2048"
+          health-check-path: /api/health
+          min-task-count: 1
+          max-task-count: 1
+          environment-variables: |
+            [
+              {"name":"GROQ_API_KEY","value":"${{ secrets.GROQ_API_KEY }}"},
+              {"name":"GROQ_MODEL","value":"openai/gpt-oss-20b"},
+              {"name":"WEB_RESEARCH_ENABLED","value":"true"},
+              {"name":"RERANKER_ENABLED","value":"false"}
+            ]
+
+      - name: Publish the API URL
+        run: echo "API URL ${{ steps.service.outputs.endpoint }}" >> "$GITHUB_STEP_SUMMARY"

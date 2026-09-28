@@ -347,23 +347,24 @@ def _settled(phrase: str) -> bool:
     return "no specific priority" not in low
 
 
-def _explain(role: str, phrase: str, priority: str, condition: str = "") -> str:
-    """Two sentences. The fact is the supplied phrase; the second says why it matters."""
+def _explain(role: str, phrase: str, priority: str, condition: str = "", company: str = "") -> str:
+    """Two sentences. The fact is the supplied phrase; the second says why it matters for this client."""
     del condition
+    who = company.strip() or "the client"
     if not _settled(phrase):
-        return "This point is not established from the supplied policy documentation. It is not treated as a documented benefit, and it should be confirmed in the wording before a decision."
+        return f"This point is not established from the supplied policy documentation for {who}. It is not treated as a documented benefit, and it should be confirmed in the wording before a decision."
     fact = phrase.rstrip(".")
     shown = fact[0].lower() + fact[1:] if fact[:1].isupper() else fact
     if role == "priority":
         named = f", {priority}," if priority else ""
-        return f"The brochure documents {shown}. This is read against the stated priority{named} which is the requirement the advisory was asked to answer."
+        return f"The brochure documents {shown}. For {who}, this is read against the stated priority{named} which is the requirement the advisory was asked to answer."
     if role == "room":
-        return f"The supplied room-rent wording is: {fact}. This is what the client can use to judge whether a room-rent limit would reduce an eligible hospitalisation claim."
+        return f"The supplied room-rent wording is: {fact}. This is what {who} can use to judge whether a room-rent limit would reduce an eligible hospitalisation claim."
     if role == "cover":
-        return f"On hospitalisation, the supplied wording states: {fact}. That is the core protection available for an eligible in-patient claim."
+        return f"On hospitalisation, the supplied wording states: {fact}. That is the core protection available to {who} for an eligible in-patient claim."
     if role == "design":
-        return f"On policy design, the supplied wording states: {fact}. This bears on how cover behaves after a claim, or on the period before cover applies."
-    return f"The supplied wording states: {fact}. It is included because it bears on the decision the client is making."
+        return f"On policy design, the supplied wording states: {fact}. For {who}, this bears on how cover behaves after a claim, or on the period before cover applies."
+    return f"The supplied wording states: {fact}. It is included because it bears on the decision {who} is making."
 
 
 def _why_body(item: EvidenceItem, exposures: list[Exposure], clip) -> str:
@@ -437,11 +438,42 @@ def _headcount(profile: CompanyProfile) -> str | None:
     return None
 
 
+def _known(value: str | None) -> str:
+    text = " ".join((value or "").split()).strip()
+    if not text or text.lower() in {"unknown", "not established", "none", "n/a"}:
+        return ""
+    return text
+
+
+def _company_brief(profile: CompanyProfile, pack: EvidencePack) -> str:
+    """One sentence from researched company material. The client name is always in it."""
+    name = (profile.company_name or "the client").strip() or "the client"
+    overview = _known(profile.overview)
+    if overview:
+        sentence = overview if overview.endswith(".") else f"{overview}."
+        if name.lower() not in sentence.lower():
+            sentence = f"{name}. {sentence}"
+        return _clip_text(sentence, 280)
+    for fact in pack.company_evidence:
+        text = _known(fact.text)
+        if not text:
+            continue
+        sentence = text if text.endswith(".") else f"{text}."
+        if name.lower() not in sentence.lower():
+            sentence = f"{name}. {sentence}"
+        return _clip_text(sentence, 280)
+    bits = [part for part in (_known(profile.industry), _known(profile.geography), _headcount(profile) or _known(profile.size)) if part]
+    if bits:
+        return f"{name} is {', '.join(bits)}."
+    return f"This advisory is prepared for {name}."
+
+
 def _context_slide(profile: CompanyProfile, exposures: list[Exposure], pack: EvidencePack) -> Slide:
     """Who the client is, what they asked for, and what the advisory is weighing."""
+    name = (profile.company_name or "the client").strip() or "the client"
     slide = Slide(
         slide_number=1,
-        title="The decision context",
+        title=f"{name}: the decision context",
         subtitle=None,
         layout="glance",
         bullets=[],
@@ -460,10 +492,10 @@ def _context_slide(profile: CompanyProfile, exposures: list[Exposure], pack: Evi
             title = exposure.title.split(":", 1)[1].strip() if ":" in exposure.title else exposure.title
             slide.bullets.append(SlideBullet(text=f"PRIORITY|{title}", kind="company"))
         slide.bullets.append(SlideBullet(text=f"WEIGHT|{_priority_weight_label()}", kind="recommendation"))
-        slide.bullets.append(SlideBullet(text=f"WHY|{_WHY_PRIORITY}", kind="recommendation"))
+        slide.bullets.append(SlideBullet(text=f"WHY|{_clip_text(_company_brief(profile, pack) + ' ' + _WHY_PRIORITY, 320)}", kind="recommendation"))
         slide.bullets.append(SlideBullet(text=f"LENS|{_LENS_PRIORITY}", kind="recommendation"))
     else:
-        slide.bullets.append(SlideBullet(text=f"WHY|{_WHY_BASELINE}", kind="recommendation"))
+        slide.bullets.append(SlideBullet(text=f"WHY|{_company_brief(profile, pack)}", kind="recommendation"))
         slide.bullets.append(SlideBullet(text=f"LENS|{_LENS_BASELINE}", kind="recommendation"))
     labels = _assessed_labels(exposures)
     if labels:
@@ -531,8 +563,9 @@ def _advisory_body(profile: CompanyProfile, exposures: list[Exposure], recommend
     """Comparison, recommendation reasons, and the client summary. Built only from stored evidence."""
     pid = pack.recommended_policy_id
     name = (recommendation.policy_name or "The recommended policy").strip()
+    client = (profile.company_name or "the client").strip() or "the client"
     columns = _policy_columns(matrix, recommendation)
-    basis = _BASIS_LINE if _advisor_priorities(exposures) else "Selected based on the documented policy benefits and the standard coverage requirements."
+    basis = f"For {client}, these points follow the researched company context and the supplied brochure wording."
 
     rows = _comparison_rows(exposures)
     priority_name = _priority_title(exposures)
@@ -581,7 +614,7 @@ def _advisory_body(profile: CompanyProfile, exposures: list[Exposure], recommend
     why = Slide(
         slide_number=3,
         title="Why this policy fits",
-        subtitle="Why it fits the client's requirements",
+        subtitle=f"Why it fits {client}",
         layout="why",
         bullets=[SlideBullet(text=f"POLICY|{name}", kind="recommendation")],
     )
@@ -590,7 +623,7 @@ def _advisory_body(profile: CompanyProfile, exposures: list[Exposure], recommend
     for label, _feature, phrase, item in chosen_rows:
         condition = item.conditions[0] if item and item.conditions and len(item.conditions[0]) <= 48 else ""
         why.bullets.append(SlideBullet(
-            text=f"{label}|{clip(_explain(role_for.get(label, 'other'), phrase, priority_name, condition), 320)}",
+            text=f"{label}|{clip(_explain(role_for.get(label, 'other'), phrase, priority_name, condition, client), 320)}",
             source_chunk_ids=(item.chunk_ids[:1] if item else []),
             policy_id=pid,
             kind="policy",
@@ -621,7 +654,7 @@ def _advisory_body(profile: CompanyProfile, exposures: list[Exposure], recommend
                 offer_bit = f"instant cover for {listed} after 30 days"
             else:
                 offer_bit = _concise(offer, 72) if offer else ""
-            body = f"{alt.policy_name} was also considered."
+            body = f"For {client}, {alt.policy_name} was also considered."
             if offer_bit:
                 body += f" It offers {offer_bit.rstrip('.')}."
             if trade:
@@ -646,7 +679,7 @@ def _advisory_body(profile: CompanyProfile, exposures: list[Exposure], recommend
             if role == "priority" and not _settled(phrase):
                 body = _WHY_BASELINE
             else:
-                body = _explain(role if role != "practical" else "other", phrase, priority_name)
+                body = _explain(role if role != "practical" else "other", phrase, priority_name, company=client)
         decision.bullets.append(SlideBullet(
             text=f"{heading}|{clip(body, 280)}",
             source_chunk_ids=chunk_ids,

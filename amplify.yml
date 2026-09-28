@@ -1,0 +1,19 @@
+version: 1
+applications:
+  - appRoot: frontend
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+        build:
+          commands:
+            - test -n "$NEXT_PUBLIC_API_URL" || (echo "Set NEXT_PUBLIC_API_URL in Amplify to the AWS API URL" && exit 1)
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
