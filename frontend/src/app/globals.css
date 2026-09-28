@@ -28,7 +28,7 @@
   --accent-hue: 198;         /* Marsh cyan #00A8C7 */
   --marsh-navy: #00143f;
   --marsh-white: #ffffff;
-  --marsh-cream: #e8eef5;
+  --marsh-cream: #dce9f4;
   --contrast: 1;             /* 1 = default; >1 = higher-contrast theme */
 
   /* --- type ---------------------------------------------------------------- */
@@ -61,14 +61,14 @@
   --slide-ink: #0b1f44;
   --slide-body: #0b1f44;
   --slide-muted: #5f6b7a;
-  --slide-rule: #d9e1ea;
-  --slide-canvas: #f4f7fa;
-  --slide-sky: #e8eef5;
+  --slide-rule: #c5d5e5;
+  --slide-canvas: #e7f0f8;
+  --slide-sky: #dce9f4;
   --slide-ocean: var(--marsh-navy);
   --slide-accent: var(--marsh-navy);
-  --slide-accent-tint: #e8eef5;
+  --slide-accent-tint: #dce9f4;
   --slide-gold: var(--marsh-white);
-  --slide-hover: #e8eef5;
+  --slide-hover: #dce9f4;
   --font-slide-serif: "Georgia Pro", Georgia, "Times New Roman", serif;
   --font-slide-sans: Calibri, Carlito, "Segoe UI", var(--font-sans);
 }
@@ -77,10 +77,10 @@
    Light Marsh chrome. Navy is reserved for actions, selection, and the logo.
    --------------------------------------------------------------------------- */
 :root {
-  --canvas:   #f4f7fa;
+  --canvas:   #e7f0f8;
   --panel:    #ffffff;
   --surface:  #ffffff;
-  --raised:   #e8eef5;
+  --raised:   #dce9f4;
   --overlay:  #ffffff;
   --veil:     #00143fcc;
 
@@ -89,8 +89,8 @@
   --ink-muted: #5f6b7a;
   --quiet:    #5f6b7a;
 
-  --hairline:        #d9e1ea;
-  --hairline-strong: #d9e1ea;
+  --hairline:        #c5d5e5;
+  --hairline-strong: #c5d5e5;
   --hairline-bright: #00143f;
 
   --accent:      var(--marsh-navy);
@@ -122,7 +122,7 @@
   --secondary-foreground: var(--marsh-navy);
   --muted: var(--raised);
   --muted-foreground: var(--ink-muted);
-  --accent: #e8eef5;               /* shadcn "accent" = hover fill, not brand */
+  --accent: #dce9f4;               /* shadcn "accent" = hover fill, not brand */
   --destructive: var(--danger);
   --border: var(--hairline);
   --input: var(--hairline-strong);
