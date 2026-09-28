@@ -43,7 +43,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
 
   return (
     <div className="flex h-dvh bg-canvas">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-[#e4ddd6] bg-canvas text-marsh-navy">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-hairline bg-raised text-ink">
         <div className="flex h-16 items-center px-5">
           <Link href="/" className="focus-ring flex items-center rounded-md" aria-label="Marsh Health Policy Advisory, home">
             <Image src="/marsh-wordmark.png" alt="Marsh" width={1029} height={227} priority className="h-7 w-auto border-0 bg-transparent shadow-none" />
@@ -55,10 +55,10 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
           </Link>
         </div>
         <nav className="thin-scroll flex-1 overflow-y-auto px-2 pb-3" aria-label="Pitches">
-          <div className="kicker px-2 pb-1 pt-2 text-marsh-navy/55">Pitches</div>
+          <div className="kicker px-2 pb-1 pt-2 text-quiet">Pitches</div>
           {deleteError && <p className="px-2 pb-1 text-2xs text-marsh-navy">{deleteError}</p>}
           {recent.length === 0 ? (
-            <p className="px-2 py-1 text-xs text-marsh-navy/55">Nothing yet.</p>
+            <p className="px-2 py-1 text-xs text-quiet">Nothing yet.</p>
           ) : (
             <ul className="space-y-px">
               {recent.map((r) => {
@@ -67,10 +67,10 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
                 const confirming = pendingDelete === r.run_id;
                 return (
                   <li key={r.run_id} className="group flex items-center gap-0.5">
-                    <Link href={`/runs/${r.run_id}`} aria-current={on ? "page" : undefined} title={`${r.company_name} · ${rs.label}`} className={cn("focus-ring flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-(--dur-fast)", on ? "bg-marsh-navy text-marsh-white" : "text-marsh-navy hover:bg-marsh-navy/10")}>
+                    <Link href={`/runs/${r.run_id}`} aria-current={on ? "page" : undefined} title={`${r.company_name} · ${rs.label}`} className={cn("focus-ring flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-(--dur-fast)", on ? "bg-marsh-navy text-marsh-white" : "text-ink hover:bg-white")}>
                       <span className={cn(`tone-${rs.tone} tint-dot size-1.5 shrink-0 rounded-full`)} aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{r.company_name}</span>
-                      <span className={cn("shrink-0 text-2xs tabular-nums", on ? "text-marsh-white/70" : "text-marsh-navy/50")}>{r.status === "awaiting_review" ? "needs you" : fmtRelative(r.updated_at)}</span>
+                      <span className={cn("shrink-0 text-2xs tabular-nums", on ? "text-marsh-white/70" : "text-quiet")}>{r.status === "awaiting_review" ? "needs you" : fmtRelative(r.updated_at)}</span>
                     </Link>
                     <button
                       type="button"
