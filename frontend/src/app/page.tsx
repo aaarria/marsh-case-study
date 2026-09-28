@@ -106,7 +106,7 @@ export default function Composer() {
                 }}
                 placeholder="Company name, e.g. Tata Consultancy Services"
                 aria-label="Company name"
-                className="min-h-11 flex-1 resize-none rounded-md border border-hairline bg-white px-3 py-2 text-lg text-ink outline-none placeholder:text-quiet focus:border-marsh-navy"
+                className="min-h-11 flex-1 resize-none rounded-md border border-hairline bg-surface px-3 py-2 text-lg text-ink outline-none placeholder:text-quiet focus:border-marsh-navy"
               />
               <Button type="submit" disabled={!canSend} loading={submitting} className="w-full sm:w-auto" aria-label="Start pitch" title={name.length < 2 ? "Type the company name to start" : tooFew ? `Keep at least ${MIN_POLICIES} policies` : undefined}>
                 Start pitch <ArrowUp className="size-4" />
@@ -137,7 +137,7 @@ export default function Composer() {
                       type="button"
                       aria-pressed={on}
                       onClick={() => setSelected((s) => (s.includes(p.policy_id) ? s.filter((x) => x !== p.policy_id) : [...s, p.policy_id]))}
-                      className={cn("flex min-h-20 flex-col items-start justify-between rounded-md border px-4 py-3 text-left transition-colors", on ? "border-marsh-navy bg-marsh-navy text-white" : "border-hairline-strong bg-white text-ink hover:border-marsh-navy")}
+                      className={cn("flex min-h-20 flex-col items-start justify-between rounded-md border px-4 py-3 text-left transition-colors", on ? "border-marsh-navy bg-marsh-navy text-white" : "border-hairline-strong bg-surface text-ink hover:border-marsh-navy")}
                     >
                       <span className={cn("text-2xs font-semibold tracking-wide", on ? "text-white/80" : "text-quiet")}>{on ? "SELECTED" : "NOT SELECTED"}</span>
                       <span className="text-sm font-medium">{p.policy_name}</span>
@@ -146,7 +146,7 @@ export default function Composer() {
                 })}
               </div>
               <div className="mt-3">
-                <label className="inline-flex cursor-pointer rounded-md border border-marsh-navy bg-white px-4 py-2.5 text-sm font-medium text-marsh-navy hover:bg-marsh-cream">
+                <label className="inline-flex cursor-pointer rounded-md border border-marsh-navy bg-surface px-4 py-2.5 text-sm font-medium text-marsh-navy hover:bg-marsh-cream">
                   <input
                     type="file"
                     accept="application/pdf,.pdf"

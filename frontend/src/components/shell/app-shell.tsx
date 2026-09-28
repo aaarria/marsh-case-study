@@ -44,19 +44,19 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
 
   return (
     <div className="flex h-dvh flex-col bg-canvas lg:flex-row">
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-hairline bg-raised px-3 lg:hidden">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-hairline bg-sidebar px-3 lg:hidden">
         <Link href="/" className="focus-ring flex min-w-0 items-center rounded-md" aria-label="Marsh Health Policy Advisory, home">
           <Image src="/marsh-wordmark.png" alt="Marsh" width={1029} height={227} priority className="h-6 w-auto border-0 bg-transparent shadow-none" />
         </Link>
         <Link href="/" className="focus-ring ml-auto flex h-9 items-center gap-1 rounded-md bg-marsh-navy px-2.5 text-sm font-medium text-marsh-white">
           <Plus className="size-3.5" /> New pitch
         </Link>
-        <button type="button" className="focus-ring h-9 rounded-md border border-hairline bg-white px-2.5 text-sm text-ink" aria-expanded={pitchesOpen} onClick={() => setPitchesOpen((open) => !open)}>
+        <button type="button" className="focus-ring h-9 rounded-md border border-hairline bg-surface px-2.5 text-sm text-ink" aria-expanded={pitchesOpen} onClick={() => setPitchesOpen((open) => !open)}>
           Pitches
         </button>
       </div>
       {pitchesOpen && (
-        <div className="max-h-52 shrink-0 overflow-y-auto border-b border-hairline bg-raised lg:hidden">
+        <div className="max-h-52 shrink-0 overflow-y-auto border-b border-hairline bg-sidebar lg:hidden">
           <nav className="px-2 py-2" aria-label="Pitches">
             {deleteError && <p className="px-2 pb-1 text-2xs text-marsh-navy">{deleteError}</p>}
             {recent.length === 0 ? (
@@ -80,7 +80,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
           </nav>
         </div>
       )}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-hairline bg-raised text-ink lg:flex">
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-hairline bg-sidebar text-ink lg:flex">
         <div className="flex h-16 items-center px-5">
           <Link href="/" className="focus-ring flex items-center rounded-md" aria-label="Marsh Health Policy Advisory, home">
             <Image src="/marsh-wordmark.png" alt="Marsh" width={1029} height={227} priority className="h-7 w-auto border-0 bg-transparent shadow-none" />
@@ -104,7 +104,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
                 const confirming = pendingDelete === r.run_id;
                 return (
                   <li key={r.run_id} className="group flex items-center gap-0.5">
-                    <Link href={`/runs/${r.run_id}`} aria-current={on ? "page" : undefined} title={`${r.company_name} · ${rs.label}`} className={cn("focus-ring flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-(--dur-fast)", on ? "bg-marsh-navy text-marsh-white" : "text-ink hover:bg-white")}>
+                    <Link href={`/runs/${r.run_id}`} aria-current={on ? "page" : undefined} title={`${r.company_name} · ${rs.label}`} className={cn("focus-ring flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-(--dur-fast)", on ? "bg-marsh-navy text-marsh-white" : "text-ink hover:bg-surface")}>
                       <span className={cn(`tone-${rs.tone} tint-dot size-1.5 shrink-0 rounded-full`)} aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{r.company_name}</span>
                       <span className={cn("shrink-0 text-2xs tabular-nums", on ? "text-marsh-white/70" : "text-quiet")}>{r.status === "awaiting_review" ? "needs you" : fmtRelative(r.updated_at)}</span>

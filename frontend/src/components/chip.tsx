@@ -17,7 +17,7 @@ export function Chip({ selected, onClick, children, title, className, size = "sm
       className={cn(
         "focus-ring inline-flex items-center whitespace-nowrap rounded-md border font-medium transition-[background-color,border-color,color,transform] duration-(--dur-fast) active:scale-[0.98]",
         size === "xs" ? "h-8 px-3 text-xs" : "h-9 px-3.5 text-sm",
-        selected ? "border-marsh-navy bg-marsh-navy text-white" : "border-marsh-navy/25 bg-white text-marsh-navy hover:border-marsh-navy hover:bg-marsh-cream",
+        selected ? "border-marsh-navy bg-marsh-navy text-white" : "border-marsh-navy/25 bg-surface text-marsh-navy hover:border-marsh-navy hover:bg-marsh-cream",
         className,
       )}
     >
