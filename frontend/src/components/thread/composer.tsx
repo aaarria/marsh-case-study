@@ -70,7 +70,7 @@ export function ThreadComposer({ state, refresh, policyName }: { state: RunState
   };
 
   return (
-    <div className="shrink-0 border-t border-hairline bg-marsh-cream px-4 pb-4 pt-3">
+    <div className="shrink-0 border-t border-hairline bg-canvas px-4 pb-4 pt-3">
       <form
         onSubmit={(e) => {
           e.preventDefault();
