@@ -44,13 +44,13 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
   return (
     <div className="flex h-dvh bg-canvas">
       <aside className="flex w-56 shrink-0 flex-col border-r border-[#e4ddd6] bg-marsh-cream text-marsh-navy">
-        <div className="flex h-12 items-center px-4">
-          <Link href="/" className="focus-ring flex items-center gap-2 rounded-md" aria-label="Marsh Health Policy Advisory, home">
-            <Image src="/marsh.png" alt="Marsh" width={1176} height={400} priority className="h-8 w-auto" />
+        <div className="flex h-16 items-center px-5">
+          <Link href="/" className="focus-ring flex items-center rounded-md" aria-label="Marsh Health Policy Advisory, home">
+            <Image src="/marsh-wordmark.png" alt="Marsh" width={1029} height={227} priority className="h-7 w-auto border-0 bg-transparent shadow-none" />
           </Link>
         </div>
-        <div className="px-3 pb-2">
-          <Link href="/" className="focus-ring flex h-8 items-center justify-center gap-1.5 rounded-md bg-marsh-navy text-sm font-medium text-marsh-white transition-[transform,opacity] duration-(--dur-fast) hover:opacity-90 active:scale-[0.985]">
+        <div className="px-4 pb-3">
+          <Link href="/" className="focus-ring flex h-10 items-center justify-center gap-1.5 rounded-md bg-marsh-navy px-3 text-sm font-medium text-marsh-white transition-[transform,opacity] duration-(--dur-fast) hover:bg-marsh-navy/90 active:scale-[0.985]">
             <Plus className="size-3.5" /> New pitch
           </Link>
         </div>
@@ -90,7 +90,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-        <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-hairline bg-panel px-3 text-2xs text-quiet" aria-label="System status">
+        <footer className="flex h-8 shrink-0 items-center gap-3 border-t border-hairline bg-marsh-cream px-4 text-2xs text-quiet" aria-label="System status">
           <span className="flex items-center gap-1.5">
             <Matrix variant="scan" state={r.error ? "error" : working ? "working" : r.llmOffline ? "idle" : "done"} title={r.error ? "API unreachable" : working ? "Working" : "Ready"} />
             <span className={cn(working && "t-shimmer")}>{r.error ? "API unreachable" : working ? "Working…" : r.loading ? "Connecting…" : "Ready"}</span>
@@ -98,8 +98,8 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
           {h && (
             <>
               <span className="text-hairline-bright">|</span>
-              <span className="truncate" title="GEMINI_MODEL, the only model used; never switched">
-                {h.llm_configured ? h.llm_model : "no Gemini key"}
+              <span className="truncate" title={h.llm_provider === "groq" ? "Groq model" : "Gemini model"}>
+                {h.llm_configured ? h.llm_model : "no model key"}
                 {h.llm_configured && !h.model_free_tier_known && <span className="tone-warn tint-text"> · not on the free-tier list</span>}
               </span>
               <span className="text-hairline-bright">|</span>
@@ -108,7 +108,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
               <span>
                 {h.retrieval.ready ? `${h.retrieval.chunks ?? 0} chunks · ${h.retrieval.policies?.length ?? 0} brochures` : "indexing brochures…"}
               </span>
-              <span className="ml-auto hidden truncate sm:inline">Gemini free tier · local FAISS + BM25 · nothing exported before approval</span>
+              <span className="ml-auto hidden truncate sm:inline">{h.llm_provider === "groq" ? "Groq" : "Gemini free tier"} · local FAISS + BM25 · nothing exported before approval</span>
             </>
           )}
         </footer>

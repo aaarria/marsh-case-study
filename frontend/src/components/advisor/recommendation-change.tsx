@@ -32,9 +32,9 @@ export function RecommendationChange({ runId, onChanged }: { runId: string; onCh
 
   if (!open) {
     return (
-      <button type="button" className="focus-ring mt-2 text-xs text-ink underline-offset-2 hover:underline" onClick={() => setOpen(true)}>
+      <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => setOpen(true)}>
         Recalculate from a client priority
-      </button>
+      </Button>
     );
   }
 

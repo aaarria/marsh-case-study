@@ -169,15 +169,15 @@ export function RecommendationBrief({ view, runId }: { view: AdvisorView; runId:
               <div className="text-muted-foreground">Evidence: {row.policy_name || "Brochure"}{row.page ? `, p.${row.page}` : ""}</div>
               {row.impact && <div>{row.impact}</div>}
               {row.feature && rec.policy_id && (
-                <button type="button" className="focus-ring mt-1 text-ink underline-offset-2 hover:underline" onClick={() => setEvidence({ policyId: rec.policy_id, feature: row.feature || "", label: row.requirement })}>
+                <Button type="button" size="xs" variant="outline" className="mt-2" onClick={() => setEvidence({ policyId: rec.policy_id, feature: row.feature || "", label: row.requirement })}>
                   View evidence
-                </button>
+                </Button>
               )}
             </li>
           ))}
-          <button type="button" className="text-2xs text-quiet hover:text-body" onClick={() => setMaths((v) => !v)}>
+          <Button type="button" size="xs" variant="outline" onClick={() => setMaths((v) => !v)}>
             {maths ? "Hide score detail" : "Score detail"}
-          </button>
+          </Button>
           {maths && (
             <ul className="space-y-1 text-2xs text-quiet">
               {view.why?.map((row) => (
@@ -213,18 +213,18 @@ export function ComparisonBrief({ view, runId }: { view: AdvisorView; runId: str
         <table className="w-full min-w-[28rem] border-collapse text-left text-xs">
           <thead>
             <tr className="border-b border-hairline text-muted-foreground">
-              <th className="py-1 pr-2 font-medium">Requirement</th>
+              <th className="py-2.5 pr-3 font-medium">Requirement</th>
               {comparison.policies.map((policy) => (
-                <th key={policy.policy_id} className="px-1 py-1 font-medium">{policy.policy_name || policy.policy_id}</th>
+                <th key={policy.policy_id} className="px-2 py-2.5 font-medium">{policy.policy_name || policy.policy_id}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {comparison.rows.map((row) => (
               <tr key={row.feature} className="border-b border-hairline align-top">
-                <th className="py-1.5 pr-2 font-medium text-ink">{row.label}</th>
+                <th className="py-3 pr-3 font-medium text-ink">{row.label}</th>
                 {row.cells.map((cell) => (
-                  <td key={cell.policy_id} className="px-1 py-1.5">
+                  <td key={cell.policy_id} className="px-2 py-3">
                     <button type="button" className="focus-ring rounded-sm text-left" title={`${cell.policy_name || cell.policy_id}: ${cell.status_label}. Open the brochure evidence.`} onClick={() => setEvidence({ policyId: cell.policy_id, feature: row.feature, label: row.label })}>
                       <StatusPill tone={STATE_TONE[cell.state || ""] || "neutral"} size="xs">{cell.status_label}</StatusPill>
                       {(cell.page || cell.section) && (
@@ -268,9 +268,9 @@ export function PolicyCheckBrief({ view, runId }: { view: AdvisorView; runId: st
         Stability: {check.stability === "UNAVAILABLE" ? "Not stress-tested" : check.stability[0] + check.stability.slice(1).toLowerCase()}
       </StatusPill>
       <p className="text-xs text-body">{check.note}</p>
-      <button type="button" className="focus-ring inline-flex items-center gap-1 text-xs text-ink underline-offset-2 hover:underline" onClick={() => setOpen((v) => !v)}>
+      <Button type="button" size="sm" variant="outline" onClick={() => setOpen((v) => !v)}>
         <ShieldCheck className="size-3.5" /> {open ? "Hide Policy Check" : "Inspect Policy Check"}
-      </button>
+      </Button>
       {open && (
         <div className="space-y-3">
           <section className="rounded-md border border-hairline p-2">
@@ -282,9 +282,9 @@ export function PolicyCheckBrief({ view, runId }: { view: AdvisorView; runId: st
                 <div className="text-muted-foreground">{check.challenge.explanation}</div>
                 {check.challenge.evidence_id && <div className="text-quiet">Evidence {check.challenge.evidence_id}</div>}
                 {check.challenge.policy_id && check.challenge.feature && (
-                  <button type="button" className="focus-ring text-ink underline-offset-2 hover:underline" onClick={() => setEvidence({ policyId: check.challenge!.policy_id || "", feature: check.challenge!.feature || "", label: check.challenge!.requirement })}>
+                  <Button type="button" size="xs" variant="outline" className="mt-2" onClick={() => setEvidence({ policyId: check.challenge!.policy_id || "", feature: check.challenge!.feature || "", label: check.challenge!.requirement })}>
                     View evidence
-                  </button>
+                  </Button>
                 )}
               </div>
             ) : (
@@ -309,9 +309,9 @@ export function PolicyCheckBrief({ view, runId }: { view: AdvisorView; runId: st
                   </ul>
                   {scenario.limitation && <div className="text-muted-foreground">{scenario.limitation}</div>}
                   {scenario.feature && scenario.outcomes[0]?.policy_id && (
-                    <button type="button" className="focus-ring text-ink underline-offset-2 hover:underline" onClick={() => setEvidence({ policyId: scenario.outcomes[0].policy_id || "", feature: scenario.feature || "", label: scenario.requirement })}>
+                    <Button type="button" size="xs" variant="outline" className="mt-2" onClick={() => setEvidence({ policyId: scenario.outcomes[0].policy_id || "", feature: scenario.feature || "", label: scenario.requirement })}>
                       View evidence
-                    </button>
+                    </Button>
                   )}
                 </li>
               ))}

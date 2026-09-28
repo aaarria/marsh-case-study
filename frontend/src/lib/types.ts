@@ -435,7 +435,7 @@ export interface Answer {
 export interface Health {
   status: string;
   llm_configured: boolean;
-  llm_provider: "gemini";
+  llm_provider: "groq" | "gemini";
   llm_model: string;
   /** Whether GEMINI_MODEL is on Google's published free-tier list. */
   model_free_tier_known: boolean;

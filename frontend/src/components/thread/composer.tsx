@@ -70,7 +70,7 @@ export function ThreadComposer({ state, refresh, policyName }: { state: RunState
   };
 
   return (
-    <div className="shrink-0 border-t border-hairline bg-panel/60 px-3 pb-3 pt-2">
+    <div className="shrink-0 border-t border-hairline bg-marsh-cream px-4 pb-4 pt-3">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -98,8 +98,8 @@ export function ThreadComposer({ state, refresh, policyName }: { state: RunState
           className="thin-scroll min-h-8 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm leading-6 text-ink outline-none placeholder:truncate placeholder:text-quiet disabled:cursor-not-allowed"
         />
         {/* Sending: spinner (request in flight). Agent working: the scan matrix, like the thread's working row and the status bar. */}
-        <Button type="submit" size="icon-sm" disabled={!enabled || !text.trim()} loading={busy} aria-busy={working || undefined} aria-label={working ? "Working" : "Send"} className={cn(working && "disabled:opacity-100")}>
-          {working ? <Matrix variant="scan" title="Working" /> : <ArrowUp className="size-4" />}
+        <Button type="submit" size="sm" disabled={!enabled || !text.trim()} loading={busy} aria-busy={working || undefined} aria-label={working ? "Working" : "Send"} className={cn(working && "disabled:opacity-100")}>
+          {working ? <Matrix variant="scan" title="Working" /> : <>Send <ArrowUp className="size-4" /></>}
         </Button>
       </form>
       <div className="mt-1.5 flex items-center justify-between gap-3 px-1 text-2xs text-quiet">
