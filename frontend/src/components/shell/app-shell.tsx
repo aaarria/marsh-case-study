@@ -23,6 +23,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
   const [recent, setRecent] = useState<RunSummary[]>([]);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pitchesOpen, setPitchesOpen] = useState(false);
   useEffect(() => {
     api.runs(30).then((r) => setRecent(r.runs)).catch(() => {});
   }, [runId, refreshKey]);
@@ -42,8 +43,44 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
   const working = refreshKey === "running";
 
   return (
-    <div className="flex h-dvh bg-canvas">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-hairline bg-raised text-ink">
+    <div className="flex h-dvh flex-col bg-canvas lg:flex-row">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-hairline bg-raised px-3 lg:hidden">
+        <Link href="/" className="focus-ring flex min-w-0 items-center rounded-md" aria-label="Marsh Health Policy Advisory, home">
+          <Image src="/marsh-wordmark.png" alt="Marsh" width={1029} height={227} priority className="h-6 w-auto border-0 bg-transparent shadow-none" />
+        </Link>
+        <Link href="/" className="focus-ring ml-auto flex h-9 items-center gap-1 rounded-md bg-marsh-navy px-2.5 text-sm font-medium text-marsh-white">
+          <Plus className="size-3.5" /> New pitch
+        </Link>
+        <button type="button" className="focus-ring h-9 rounded-md border border-hairline bg-white px-2.5 text-sm text-ink" aria-expanded={pitchesOpen} onClick={() => setPitchesOpen((open) => !open)}>
+          Pitches
+        </button>
+      </div>
+      {pitchesOpen && (
+        <div className="max-h-52 shrink-0 overflow-y-auto border-b border-hairline bg-raised lg:hidden">
+          <nav className="px-2 py-2" aria-label="Pitches">
+            {deleteError && <p className="px-2 pb-1 text-2xs text-marsh-navy">{deleteError}</p>}
+            {recent.length === 0 ? (
+              <p className="px-2 py-1 text-xs text-quiet">Nothing yet.</p>
+            ) : (
+              <ul className="space-y-px">
+                {recent.map((row) => {
+                  const rs = runStatus(row);
+                  const on = row.run_id === runId;
+                  return (
+                    <li key={row.run_id}>
+                      <Link href={`/runs/${row.run_id}`} aria-current={on ? "page" : undefined} className={cn("focus-ring flex h-9 items-center gap-2 rounded-md px-2 text-sm", on ? "bg-marsh-navy text-marsh-white" : "text-ink")}>
+                        <span className="min-w-0 flex-1 truncate">{row.company_name}</span>
+                        <span className={cn("shrink-0 text-2xs", on ? "text-marsh-white/70" : "text-quiet")}>{rs.label}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </nav>
+        </div>
+      )}
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-hairline bg-raised text-ink lg:flex">
         <div className="flex h-16 items-center px-5">
           <Link href="/" className="focus-ring flex items-center rounded-md" aria-label="Marsh Health Policy Advisory, home">
             <Image src="/marsh-wordmark.png" alt="Marsh" width={1029} height={227} priority className="h-7 w-auto border-0 bg-transparent shadow-none" />
@@ -90,7 +127,7 @@ export function AppShell({ children, runId, refreshKey }: { children: React.Reac
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-        <footer className="flex h-8 shrink-0 items-center gap-3 border-t border-hairline bg-canvas px-4 text-2xs text-quiet" aria-label="System status">
+        <footer className="flex h-8 shrink-0 items-center gap-3 overflow-x-auto border-t border-hairline bg-canvas px-3 text-2xs text-quiet sm:px-4" aria-label="System status">
           <span className="flex items-center gap-1.5">
             <Matrix variant="scan" state={r.error ? "error" : working ? "working" : r.llmOffline ? "idle" : "done"} title={r.error ? "API unreachable" : working ? "Working" : "Ready"} />
             <span className={cn(working && "t-shimmer")}>{r.error ? "API unreachable" : working ? "Working…" : r.loading ? "Connecting…" : "Ready"}</span>

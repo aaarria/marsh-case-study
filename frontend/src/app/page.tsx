@@ -63,12 +63,12 @@ export default function Composer() {
 
   return (
     <AppShell>
-      <main className="thin-scroll flex flex-1 flex-col items-center overflow-y-auto px-8 py-14">
-        <div className="w-full max-w-2xl space-y-10">
+      <main className="thin-scroll flex flex-1 flex-col items-center overflow-y-auto px-4 py-8 sm:px-8 sm:py-14">
+        <div className="w-full max-w-2xl space-y-8 sm:space-y-10">
           {readiness.error && <ErrorBlock message={readiness.error} title="API unavailable" />}
           <SystemNotice r={readiness} detailed />
           <div className="pt-2 text-center">
-            <h1 className="display text-4xl sm:text-5xl">Marsh Health Policy Advisory</h1>
+            <h1 className="display text-3xl sm:text-4xl lg:text-5xl">Marsh Health Policy Advisory</h1>
             <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">Evidence-led health insurance comparison and advisory system</p>
             <details className="mx-auto mt-4 max-w-md text-left">
               <summary className="cursor-pointer text-sm text-ink">Who are we advising?</summary>
@@ -91,7 +91,7 @@ export default function Composer() {
             }}
             className="panel overflow-hidden"
           >
-            <div className="flex items-end gap-3 p-5">
+            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:p-5">
               <textarea
                 autoFocus
                 rows={1}
@@ -108,7 +108,7 @@ export default function Composer() {
                 aria-label="Company name"
                 className="min-h-11 flex-1 resize-none rounded-md border border-hairline bg-white px-3 py-2 text-lg text-ink outline-none placeholder:text-quiet focus:border-marsh-navy"
               />
-              <Button type="submit" disabled={!canSend} loading={submitting} aria-label="Start pitch" title={name.length < 2 ? "Type the company name to start" : tooFew ? `Keep at least ${MIN_POLICIES} policies` : undefined}>
+              <Button type="submit" disabled={!canSend} loading={submitting} className="w-full sm:w-auto" aria-label="Start pitch" title={name.length < 2 ? "Type the company name to start" : tooFew ? `Keep at least ${MIN_POLICIES} policies` : undefined}>
                 Start pitch <ArrowUp className="size-4" />
               </Button>
             </div>
@@ -128,7 +128,7 @@ export default function Composer() {
               <p className="text-sm text-ink">Select the policy brochures to compare</p>
               <p className="mt-1 text-2xs text-quiet">{policies.length === 0 ? "Loading the ingested brochures…" : `Comparing ${selected.length} ingested brochure${selected.length === 1 ? "" : "s"}.`}</p>
               {tooFew && <p className="tone-danger tint-text mt-1.5 text-xs">Keep at least {MIN_POLICIES} policies: a recommendation needs something to be compared against.</p>}
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {policies.map((p) => {
                   const on = selected.includes(p.policy_id);
                   return (

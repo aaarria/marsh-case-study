@@ -9,6 +9,7 @@ import { GateBadge, RunStatusBadge } from "@/components/status-badge";
 import { ErrorBlock, LoadingBlock } from "@/components/states";
 import { api } from "@/lib/api";
 import { shortName } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { storedCompanyName } from "@/lib/intake";
 import { useRun } from "@/lib/use-run";
 import type { PolicyDocument } from "@/lib/types";
@@ -26,10 +27,11 @@ export default function RunPage({ params }: { params: Promise<{ runId: string }>
 
   const rec = state?.values.recommendation;
   const gate = state?.values.audit?.summary.gate ?? state?.run.audit_gate;
+  const [pane, setPane] = useState<"thread" | "deck">("thread");
 
   return (
     <AppShell runId={runId} refreshKey={state?.run.status}>
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-hairline px-5">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-hairline px-3 sm:gap-3 sm:px-5">
         <h1 className="truncate text-sm font-medium text-ink">{storedCompanyName(state?.run?.company_name) || (loading && !state ? "Loading" : !state && error ? "Unavailable" : "Pitch")}</h1>
         {state && <RunStatusBadge status={state.run.status} errorKind={state.run.error_kind} size="xs" />}
         <GateBadge gate={gate} size="xs" />
@@ -39,11 +41,15 @@ export default function RunPage({ params }: { params: Promise<{ runId: string }>
           </span>
         )}
       </header>
-      <div className="flex min-h-0 flex-1">
-        <section className="w-[28rem] shrink-0 border-r border-hairline xl:w-[32rem]" aria-label="Thread">
+      <div className="flex shrink-0 border-b border-hairline lg:hidden" role="tablist" aria-label="Pitch view">
+        <button type="button" role="tab" aria-selected={pane === "thread"} className={cn("h-10 flex-1 text-sm", pane === "thread" ? "border-b-2 border-marsh-navy font-medium text-ink" : "text-quiet")} onClick={() => setPane("thread")}>Thread</button>
+        <button type="button" role="tab" aria-selected={pane === "deck"} className={cn("h-10 flex-1 text-sm", pane === "deck" ? "border-b-2 border-marsh-navy font-medium text-ink" : "text-quiet")} onClick={() => setPane("deck")}>Deck</button>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <section className={cn("min-h-0 flex-1 flex-col border-hairline lg:w-[28rem] lg:shrink-0 lg:flex-none lg:border-r xl:w-[32rem]", pane === "deck" ? "hidden lg:flex" : "flex")} aria-label="Thread">
           {error && !state ? <ErrorBlock message={error} title="Cannot load run" className="m-5" /> : loading && !state ? <div className="p-5"><LoadingBlock label="Loading run…" /></div> : state ? <Thread state={state} deck={deck} policyName={policyName} refresh={refresh} /> : null}
         </section>
-        <section className="min-w-0 flex-1 bg-canvas" aria-label="Deck">
+        <section className={cn("min-h-0 min-w-0 flex-1 bg-canvas", pane === "thread" ? "hidden lg:block" : "block")} aria-label="Deck">
           {state && <DeckPane state={state} deck={deck} />}
         </section>
       </div>

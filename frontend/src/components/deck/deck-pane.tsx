@@ -185,7 +185,7 @@ export function DeckPane({ state, deck }: { state: RunState; deck: Deck }) {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="thin-scroll w-40 shrink-0 overflow-y-auto border-r border-hairline p-2" aria-label="Slides">
+        <aside className="thin-scroll hidden w-40 shrink-0 overflow-y-auto border-r border-hairline p-2 md:block" aria-label="Slides">
           <ol className="space-y-2">
             {slides.map((s, i) => {
               const iss = countOn(s.slide_number, ISSUE);
@@ -213,7 +213,7 @@ export function DeckPane({ state, deck }: { state: RunState; deck: Deck }) {
           </ol>
         </aside>
 
-        <div className="thin-scroll flex min-w-0 flex-1 flex-col items-center overflow-y-auto px-6 py-5">
+        <div className="thin-scroll flex min-w-0 flex-1 flex-col items-center overflow-y-auto px-3 py-4 sm:px-6 sm:py-5">
           <div className="w-full max-w-[960px] space-y-4">
             <div className="relative">
               <div className="slide-stage">
